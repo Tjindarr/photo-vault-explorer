@@ -5,8 +5,8 @@
 # ---- Stage 1: Build React frontend ----
 FROM node:20-alpine AS frontend
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --ignore-scripts --legacy-peer-deps
+COPY package.json ./
+RUN npm install --legacy-peer-deps
 COPY . .
 RUN npm run build
 
