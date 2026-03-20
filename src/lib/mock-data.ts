@@ -35,6 +35,17 @@ export interface Folder {
 
 const locations = ['Barcelona, Spain', 'Tokyo, Japan', 'Portland, Oregon', 'Lake Tahoe, CA', 'Reykjavik, Iceland', 'Banff, Canada', 'Amalfi Coast, Italy', 'Queenstown, NZ'];
 const cameras = ['Sony A7IV', 'Canon R5', 'Fuji X-T5', 'Nikon Z6 III', 'iPhone 15 Pro', 'Pixel 8 Pro', 'DJI Mavic 3'];
+const locationCoords: Record<string, [number, number]> = {
+  'Barcelona, Spain': [41.3874, 2.1686],
+  'Tokyo, Japan': [35.6762, 139.6503],
+  'Portland, Oregon': [45.5152, -122.6784],
+  'Lake Tahoe, CA': [39.0968, -120.0324],
+  'Reykjavik, Iceland': [64.1466, -21.9426],
+  'Banff, Canada': [51.1784, -115.5708],
+  'Amalfi Coast, Italy': [40.6340, 14.6027],
+  'Queenstown, NZ': [-45.0312, 168.6626],
+};
+
 const folders = ['2024/Summer Trip', '2024/Family', '2023/Holiday', '2023/Nature', '2022/Wedding', '2022/Landscapes', '2024/Drone Shots', '2023/Portraits'];
 
 function seededRandom(seed: number) {
@@ -72,6 +83,8 @@ export const mockPhotos: Photo[] = Array.from({ length: 120 }, (_, i) => {
       iso: [100, 200, 400, 800, 1600, 3200][Math.floor(r2 * 6)],
       aperture: ['f/1.4', 'f/2.0', 'f/2.8', 'f/4.0', 'f/5.6', 'f/8.0'][Math.floor(r3 * 6)],
       shutterSpeed: ['1/2000', '1/1000', '1/500', '1/250', '1/125', '1/60'][Math.floor(r * 6)],
+      gpsLat: locationCoords[locations[Math.floor(r3 * locations.length)]]?.[0],
+      gpsLng: locationCoords[locations[Math.floor(r3 * locations.length)]]?.[1],
     },
     createdAt: `${year}-${month}-${day}`,
   };
