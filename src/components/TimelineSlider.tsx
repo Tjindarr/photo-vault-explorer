@@ -142,10 +142,6 @@ export default function TimelineSlider({ photos, dateRange, onDateRangeChange }:
     };
   }, [dragging, dateRange, minDate, maxDate, posToDate, onDateRangeChange]);
 
-  if (months.length === 0) return null;
-
-  const isFiltered = dateRange !== null;
-
   // Year labels
   const yearLabels = useMemo(() => {
     const labels: { year: string; pos: number }[] = [];
@@ -159,6 +155,10 @@ export default function TimelineSlider({ photos, dateRange, onDateRangeChange }:
     }
     return labels;
   }, [months, dateToPos]);
+
+  if (months.length === 0) return null;
+
+  const isFiltered = dateRange !== null;
 
   return (
     <div className="shrink-0 border-t border-border bg-surface px-3 sm:px-5 py-2.5">
