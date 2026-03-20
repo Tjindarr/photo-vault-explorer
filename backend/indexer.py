@@ -8,6 +8,10 @@ from typing import Optional
 
 import exifread
 from PIL import Image
+from pillow_heif import register_heif_opener
+
+# Register HEIC/HEIF support with Pillow
+register_heif_opener()
 
 logger = logging.getLogger(__name__)
 
