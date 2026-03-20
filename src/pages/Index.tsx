@@ -5,6 +5,7 @@ import SearchBar from '@/components/SearchBar';
 import PhotoGrid from '@/components/PhotoGrid';
 import PhotoMap from '@/components/PhotoMap';
 import PhotoViewer from '@/components/PhotoViewer';
+import TimelineSlider from '@/components/TimelineSlider';
 import { mockPhotos, mockFolderTree, type Photo } from '@/lib/mock-data';
 
 export default function Index() {
@@ -13,6 +14,7 @@ export default function Index() {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [dateRange, setDateRange] = useState<[Date, Date] | null>(null);
 
   const filteredPhotos = useMemo(() => {
     let photos = mockPhotos;
@@ -33,6 +35,32 @@ export default function Index() {
       );
     }
 
+    if (dateRange) {
+      photos = photos.filter((p) => {
+        if (!p.metadata.dateTaken) return false;
+        const d = new Date(p.metadata.dateTaken);
+        return d >= dateRange[0] && d <= dateRange[1];
+      });
+    }
+
+    return photos;
+  }, [selectedFolder, searchQuery, dateRange]);
+
+  // Photos before date filter (for the timeline histogram)
+  const photosBeforeDateFilter = useMemo(() => {
+    let photos = mockPhotos;
+    if (selectedFolder) photos = photos.filter((p) => p.folder.startsWith(selectedFolder));
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      photos = photos.filter((p) =>
+        p.filename.toLowerCase().includes(q) ||
+        p.metadata.location?.toLowerCase().includes(q) ||
+        p.metadata.camera?.toLowerCase().includes(q) ||
+        p.metadata.dateTaken?.includes(q) ||
+        p.folder.toLowerCase().includes(q) ||
+        p.type.toLowerCase().includes(q)
+      );
+    }
     return photos;
   }, [selectedFolder, searchQuery]);
 
@@ -66,6 +94,11 @@ export default function Index() {
               <PhotoMap photos={filteredPhotos} onSelect={setSelectedPhoto} />
             )}
           </div>
+          <TimelineSlider
+            photos={photosBeforeDateFilter}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
         </main>
       </div>
 
