@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import exifread
-from PIL import Image
+from PIL import Image, ExifTags
 from pillow_heif import register_heif_opener
 
 # Register HEIC/HEIF support with Pillow
@@ -20,6 +20,7 @@ THUMB_DIR = os.environ.get("THUMB_DIR", "/data/thumbnails")
 THUMB_SIZE = (400, 400)
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".heic", ".heif", ".avif"}
+HEIF_EXTENSIONS = {".heic", ".heif"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".wmv", ".flv"}
 ALL_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 
@@ -48,7 +49,12 @@ def extract_exif(filepath: str) -> dict:
         "height": 0,
     }
 
+    suffix = Path(filepath).suffix.lower()
+
     try:
+        if suffix in HEIF_EXTENSIONS:
+            return _extract_exif_with_pillow(filepath, meta)
+
         with open(filepath, "rb") as f:
             tags = exifread.process_file(f, details=False)
 
@@ -67,7 +73,6 @@ def extract_exif(filepath: str) -> dict:
         make = str(tags.get("Image Make", "")).strip()
         model = str(tags.get("Image Model", "")).strip()
         if model:
-            # Avoid duplicate make in model string
             if make and not model.lower().startswith(make.lower()):
                 meta["camera"] = f"{make} {model}"
             else:
@@ -127,13 +132,71 @@ def extract_exif(filepath: str) -> dict:
     except Exception as e:
         logger.warning(f"EXIF extraction failed for {filepath}: {e}")
 
-    # Fallback: get dimensions from PIL
     if meta["width"] == 0 or meta["height"] == 0:
         try:
             with Image.open(filepath) as img:
                 meta["width"], meta["height"] = img.size
         except Exception:
             pass
+
+    return meta
+
+
+def _extract_exif_with_pillow(filepath: str, meta: dict) -> dict:
+    """Extract metadata for HEIC/HEIF using Pillow + pillow-heif."""
+    try:
+        with Image.open(filepath) as img:
+            meta["width"], meta["height"] = img.size
+            exif = img.getexif()
+
+        if not exif:
+            return meta
+
+        exif_by_name = {
+            ExifTags.TAGS.get(tag_id, str(tag_id)): value
+            for tag_id, value in exif.items()
+        }
+
+        dt_str = exif_by_name.get("DateTimeOriginal") or exif_by_name.get("DateTimeDigitized") or exif_by_name.get("DateTime")
+        if dt_str:
+            try:
+                meta["date_taken"] = datetime.strptime(str(dt_str), "%Y:%m:%d %H:%M:%S").isoformat()
+            except ValueError:
+                pass
+
+        make = str(exif_by_name.get("Make", "")).strip()
+        model = str(exif_by_name.get("Model", "")).strip()
+        if model:
+            meta["camera"] = f"{make} {model}".strip() if make and not model.lower().startswith(make.lower()) else model
+
+        lens = exif_by_name.get("LensModel")
+        if lens:
+            meta["lens"] = str(lens)
+
+        iso = exif_by_name.get("ISOSpeedRatings")
+        if iso is not None:
+            try:
+                meta["iso"] = int(iso)
+            except (TypeError, ValueError):
+                pass
+
+        aperture = exif_by_name.get("FNumber")
+        if aperture:
+            try:
+                meta["aperture"] = f"f/{float(aperture):.1f}"
+            except (TypeError, ValueError, ZeroDivisionError):
+                pass
+
+        exposure = exif_by_name.get("ExposureTime")
+        if exposure:
+            try:
+                exposure_value = float(exposure)
+                meta["shutter_speed"] = f"1/{int(1/exposure_value)}" if exposure_value < 1 else f"{exposure_value:.1f}s"
+            except (TypeError, ValueError, ZeroDivisionError):
+                pass
+
+    except Exception as e:
+        logger.warning(f"HEIC EXIF extraction failed for {filepath}: {e}")
 
     return meta
 
