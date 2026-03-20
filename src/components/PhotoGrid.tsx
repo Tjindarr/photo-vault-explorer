@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Play, MapPin, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Photo } from '@/lib/mock-data';
@@ -8,10 +9,10 @@ interface PhotoGridProps {
   onSelect: (photo: Photo) => void;
 }
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+// A row is either a date header or a row of photo thumbnails
+type GridRow =
+  | { type: 'header'; label: string; count: number }
+  | { type: 'photos'; photos: Photo[] };
 
 function groupByDate(photos: Photo[]): Map<string, Photo[]> {
   const groups = new Map<string, Photo[]>();
@@ -25,18 +26,28 @@ function groupByDate(photos: Photo[]): Map<string, Photo[]> {
   return groups;
 }
 
-function PhotoThumbnail({ photo, onSelect, index }: { photo: Photo; onSelect: (p: Photo) => void; index: number }) {
+function buildRows(photos: Photo[], cols: number): GridRow[] {
+  if (cols <= 0) return [];
+  const grouped = groupByDate(photos);
+  const rows: GridRow[] = [];
+
+  for (const [label, groupPhotos] of grouped) {
+    rows.push({ type: 'header', label, count: groupPhotos.length });
+    for (let i = 0; i < groupPhotos.length; i += cols) {
+      rows.push({ type: 'photos', photos: groupPhotos.slice(i, i + cols) });
+    }
+  }
+  return rows;
+}
+
+function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo) => void }) {
   const [loaded, setLoaded] = useState(false);
 
   return (
     <button
       onClick={() => onSelect(photo)}
       className="group relative overflow-hidden bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 outline-none active:scale-[0.97] transition-transform duration-150"
-      style={{
-        borderRadius: 'var(--thumb-radius)',
-        aspectRatio: '1',
-        animationDelay: `${Math.min(index * 40, 400)}ms`,
-      }}
+      style={{ borderRadius: 'var(--thumb-radius)', aspectRatio: '1' }}
     >
       <img
         src={photo.thumbnailUrl}
@@ -49,11 +60,8 @@ function PhotoThumbnail({ photo, onSelect, index }: { photo: Photo; onSelect: (p
           'group-hover:scale-[1.03] group-hover:brightness-110',
         )}
       />
-      {!loaded && (
-        <div className="absolute inset-0 bg-muted animate-pulse" />
-      )}
+      {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
 
-      {/* Video badge */}
       {photo.type === 'video' && (
         <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-overlay/70 backdrop-blur-sm">
           <Play className="h-3 w-3 text-white fill-white" />
@@ -61,7 +69,6 @@ function PhotoThumbnail({ photo, onSelect, index }: { photo: Photo; onSelect: (p
         </div>
       )}
 
-      {/* Hover overlay with metadata */}
       <div className={cn(
         'absolute inset-0 bg-gradient-to-t from-overlay/60 via-transparent to-transparent',
         'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
@@ -80,7 +87,47 @@ function PhotoThumbnail({ photo, onSelect, index }: { photo: Photo; onSelect: (p
 }
 
 export default function PhotoGrid({ photos, onSelect }: PhotoGridProps) {
-  const grouped = useMemo(() => groupByDate(photos), [photos]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [cols, setCols] = useState(4);
+
+  // Measure container width and compute columns
+  const updateCols = useCallback(() => {
+    if (!containerRef.current) return;
+    const width = containerRef.current.clientWidth;
+    const minSize = width < 640 ? 120 : 200;
+    const gap = 4;
+    setCols(Math.max(2, Math.floor((width + gap) / (minSize + gap))));
+  }, []);
+
+  useEffect(() => {
+    updateCols();
+    const ro = new ResizeObserver(updateCols);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [updateCols]);
+
+  const rows = useMemo(() => buildRows(photos, cols), [photos, cols]);
+
+  const HEADER_HEIGHT = 40;
+  const GAP = 4;
+
+  // Estimate thumb size from container
+  const getThumbSize = useCallback(() => {
+    if (!containerRef.current) return 200;
+    const width = containerRef.current.clientWidth;
+    return (width - GAP * (cols - 1)) / cols;
+  }, [cols]);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: (i) => {
+      const row = rows[i];
+      if (row.type === 'header') return HEADER_HEIGHT;
+      return getThumbSize() + GAP;
+    },
+    overscan: 8,
+  });
 
   if (photos.length === 0) {
     return (
@@ -94,32 +141,61 @@ export default function PhotoGrid({ photos, onSelect }: PhotoGridProps) {
     );
   }
 
-  let globalIndex = 0;
-
   return (
-    <div className="space-y-8">
-      {Array.from(grouped.entries()).map(([dateGroup, groupPhotos]) => {
-        const startIdx = globalIndex;
-        globalIndex += groupPhotos.length;
-        return (
-          <section key={dateGroup} className="fade-in-up">
-            <div className="flex items-center gap-2 mb-3 px-1">
-              <h3 className="text-sm font-semibold text-foreground">{dateGroup}</h3>
-              <span className="text-xs text-muted-foreground tabular-nums">{groupPhotos.length} items</span>
-            </div>
-            <div className="gallery-grid">
-              {groupPhotos.map((photo, i) => (
-                <PhotoThumbnail
-                  key={photo.id}
-                  photo={photo}
-                  onSelect={onSelect}
-                  index={startIdx + i}
-                />
+    <div ref={containerRef} className="h-full overflow-y-auto scrollbar-thin">
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const row = rows[virtualRow.index];
+
+          if (row.type === 'header') {
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+                className="flex items-end gap-2 pb-1.5 px-1"
+              >
+                <h3 className="text-sm font-semibold text-foreground">{row.label}</h3>
+                <span className="text-xs text-muted-foreground tabular-nums">{row.count} items</span>
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={virtualRow.key}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+                display: 'grid',
+                gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                gap: `${GAP}px`,
+                paddingBottom: `${GAP}px`,
+              }}
+            >
+              {row.photos.map((photo) => (
+                <PhotoThumbnail key={photo.id} photo={photo} onSelect={onSelect} />
               ))}
             </div>
-          </section>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
