@@ -1,5 +1,6 @@
 import os
 import hashlib
+import subprocess
 import uuid
 import logging
 from datetime import datetime
