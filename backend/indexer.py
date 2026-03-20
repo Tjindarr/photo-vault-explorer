@@ -52,12 +52,7 @@ def extract_exif(filepath: str) -> dict:
     suffix = Path(filepath).suffix.lower()
 
     try:
-        if suffix in HEIF_EXTENSIONS:
-            return _extract_exif_with_pillow(filepath, meta)
-
-        if suffix in (".png", ".gif", ".bmp", ".webp"):
-            return _extract_exif_with_pillow(filepath, meta)
-
+        # Only use exifread for JPEG/TIFF; everything else goes through Pillow
         if suffix not in (".jpg", ".jpeg", ".tiff", ".tif"):
             return _extract_exif_with_pillow(filepath, meta)
 
