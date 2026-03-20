@@ -15,7 +15,7 @@ FROM python:3.12-slim
 
 # Install nginx and supervisor
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends nginx supervisor && \
+    apt-get install -y --no-install-recommends nginx supervisor libffi-dev libde265-dev libheif-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Create data directories
