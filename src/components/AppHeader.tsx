@@ -1,5 +1,6 @@
-import { Camera, PanelLeft, LayoutGrid, Map, BarChart3 } from 'lucide-react';
+import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
 
 export type ViewMode = 'grid' | 'map' | 'stats';
 
@@ -15,7 +16,33 @@ const views: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
   { mode: 'stats', icon: BarChart3, label: 'Stats' },
 ];
 
+function useTheme() {
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
+
+  const toggle = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('snapvault-theme', next ? 'dark' : 'light');
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('snapvault-theme');
+    if (saved === 'light') {
+      setDark(false);
+      document.documentElement.classList.remove('dark');
+    } else {
+      setDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  return { dark, toggle };
+}
+
 export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange }: AppHeaderProps) {
+  const { dark, toggle } = useTheme();
+
   return (
     <header className="h-12 shrink-0 border-b border-border bg-surface flex items-center px-3 sm:px-4 gap-2 sm:gap-3">
       <button
@@ -52,7 +79,13 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
         ))}
       </div>
 
-      <span className="text-xs text-muted-foreground hidden sm:block">Read-only viewer</span>
+      <button
+        onClick={toggle}
+        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
+        aria-label="Toggle theme"
+      >
+        {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+      </button>
     </header>
   );
 }
