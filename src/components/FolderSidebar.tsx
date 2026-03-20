@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ChevronRight, Folder as FolderIcon, Image } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronRight, Folder as FolderIcon, Image, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Folder } from '@/lib/mock-data';
 
@@ -7,6 +7,8 @@ interface FolderSidebarProps {
   folders: Folder[];
   selectedFolder: string | null;
   onSelectFolder: (path: string | null) => void;
+  open: boolean;
+  onClose: () => void;
 }
 
 function FolderNode({ folder, depth, selectedFolder, onSelectFolder }: {
@@ -59,11 +61,11 @@ function FolderNode({ folder, depth, selectedFolder, onSelectFolder }: {
   );
 }
 
-export default function FolderSidebar({ folders, selectedFolder, onSelectFolder }: FolderSidebarProps) {
+function SidebarContent({ folders, selectedFolder, onSelectFolder }: Omit<FolderSidebarProps, 'open' | 'onClose'>) {
   const totalPhotos = folders.reduce((sum, f) => sum + f.photoCount, 0);
 
   return (
-    <aside className="w-56 shrink-0 border-r border-border bg-surface h-full overflow-y-auto scrollbar-thin">
+    <>
       <div className="p-4 pb-2">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Library</h2>
         <button
@@ -93,6 +95,55 @@ export default function FolderSidebar({ folders, selectedFolder, onSelectFolder 
           />
         ))}
       </div>
-    </aside>
+    </>
+  );
+}
+
+export default function FolderSidebar({ folders, selectedFolder, onSelectFolder, open, onClose }: FolderSidebarProps) {
+  // Close on escape
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && open) onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
+
+  return (
+    <>
+      {/* Desktop sidebar — always visible on lg+ */}
+      <aside className="hidden lg:block w-56 shrink-0 border-r border-border bg-surface h-full overflow-y-auto scrollbar-thin">
+        <SidebarContent folders={folders} selectedFolder={selectedFolder} onSelectFolder={onSelectFolder} />
+      </aside>
+
+      {/* Mobile overlay sidebar */}
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-overlay/50 backdrop-blur-sm lg:hidden fade-in"
+            onClick={onClose}
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-surface border-r border-border overflow-y-auto scrollbar-thin lg:hidden shadow-xl animate-slide-in-left">
+            <div className="flex items-center justify-between p-3 border-b border-border">
+              <span className="text-sm font-semibold text-foreground">Folders</span>
+              <button
+                onClick={onClose}
+                className="p-1 rounded-md hover:bg-secondary transition-colors active:scale-95"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <SidebarContent
+              folders={folders}
+              selectedFolder={selectedFolder}
+              onSelectFolder={(path) => {
+                onSelectFolder(path);
+                onClose();
+              }}
+            />
+          </aside>
+        </>
+      )}
+    </>
   );
 }
