@@ -16,7 +16,7 @@ FROM python:3.12-slim
 # Install nginx and supervisor
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      nginx supervisor \
+      nginx supervisor ffmpeg \
       libheif-dev libde265-dev libffi-dev \
       libaom-dev libx265-dev && \
     rm -rf /var/lib/apt/lists/*

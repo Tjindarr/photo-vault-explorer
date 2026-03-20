@@ -1,5 +1,6 @@
 import os
 import hashlib
+import subprocess
 import uuid
 import logging
 from datetime import datetime
@@ -235,7 +236,6 @@ def generate_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
     try:
         os.makedirs(THUMB_DIR, exist_ok=True)
 
-        # Use subdirectories based on first 2 chars of ID to avoid too many files in one dir
         sub_dir = os.path.join(THUMB_DIR, photo_id[:2])
         os.makedirs(sub_dir, exist_ok=True)
 
@@ -247,7 +247,6 @@ def generate_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
 
         with Image.open(filepath) as img:
             img.thumbnail(THUMB_SIZE, Image.LANCZOS)
-            # Convert to RGB if necessary (handles RGBA, P mode, etc.)
             if img.mode not in ("RGB",):
                 img = img.convert("RGB")
             img.save(thumb_path, "JPEG", quality=82, optimize=True)
@@ -255,6 +254,53 @@ def generate_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
         return f"{photo_id[:2]}/{thumb_filename}"
     except Exception as e:
         logger.warning(f"Thumbnail generation failed for {filepath}: {e}")
+        return None
+
+
+def generate_video_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
+    """Generate a thumbnail from a video file using ffmpeg."""
+    try:
+        os.makedirs(THUMB_DIR, exist_ok=True)
+
+        sub_dir = os.path.join(THUMB_DIR, photo_id[:2])
+        os.makedirs(sub_dir, exist_ok=True)
+
+        thumb_filename = f"{photo_id}.jpg"
+        thumb_path = os.path.join(sub_dir, thumb_filename)
+
+        if os.path.exists(thumb_path):
+            return f"{photo_id[:2]}/{thumb_filename}"
+
+        # Extract frame at 1 second (or first frame if shorter)
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", filepath,
+                "-ss", "1", "-vframes", "1",
+                "-vf", f"scale={THUMB_SIZE[0]}:{THUMB_SIZE[1]}:force_original_aspect_ratio=decrease",
+                "-q:v", "3",
+                thumb_path,
+            ],
+            capture_output=True, timeout=30,
+        )
+
+        if result.returncode != 0 or not os.path.exists(thumb_path):
+            # Try frame 0 if seeking to 1s failed
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-i", filepath,
+                    "-vframes", "1",
+                    "-vf", f"scale={THUMB_SIZE[0]}:{THUMB_SIZE[1]}:force_original_aspect_ratio=decrease",
+                    "-q:v", "3",
+                    thumb_path,
+                ],
+                capture_output=True, timeout=30,
+            )
+
+        if os.path.exists(thumb_path):
+            return f"{photo_id[:2]}/{thumb_filename}"
+        return None
+    except Exception as e:
+        logger.warning(f"Video thumbnail generation failed for {filepath}: {e}")
         return None
 
 
@@ -298,9 +344,11 @@ def scan_directory(photos_dir: str = PHOTOS_DIR):
         if not meta.get("date_taken"):
             meta["date_taken"] = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
 
-        # Generate thumbnail for images
+        # Generate thumbnail
         thumb_path = None
-        if not is_video:
+        if is_video:
+            thumb_path = generate_video_thumbnail(str(filepath), photo_id)
+        else:
             thumb_path = generate_thumbnail(str(filepath), photo_id)
 
         yield {
