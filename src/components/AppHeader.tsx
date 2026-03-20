@@ -1,10 +1,15 @@
-import { Camera, PanelLeft } from 'lucide-react';
+import { Camera, PanelLeft, LayoutGrid, Map } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+export type ViewMode = 'grid' | 'map';
 
 interface AppHeaderProps {
   onToggleSidebar: () => void;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
 }
 
-export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
+export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange }: AppHeaderProps) {
   return (
     <header className="h-12 shrink-0 border-b border-border bg-surface flex items-center px-3 sm:px-4 gap-2 sm:gap-3">
       <button
@@ -20,8 +25,38 @@ export default function AppHeader({ onToggleSidebar }: AppHeaderProps) {
         </div>
         <h1 className="text-sm font-semibold text-foreground tracking-tight">SnapVault</h1>
       </div>
+
       <div className="flex-1" />
-      <span className="text-xs text-muted-foreground hidden sm:block">Read-only photo viewer</span>
+
+      {/* View toggle */}
+      <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+        <button
+          onClick={() => onViewModeChange('grid')}
+          className={cn(
+            'p-1.5 rounded-md transition-all duration-150 active:scale-95',
+            viewMode === 'grid'
+              ? 'bg-surface shadow-sm text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          aria-label="Grid view"
+        >
+          <LayoutGrid className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => onViewModeChange('map')}
+          className={cn(
+            'p-1.5 rounded-md transition-all duration-150 active:scale-95',
+            viewMode === 'map'
+              ? 'bg-surface shadow-sm text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          aria-label="Map view"
+        >
+          <Map className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <span className="text-xs text-muted-foreground hidden sm:block">Read-only viewer</span>
     </header>
   );
 }

@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import AppHeader from '@/components/AppHeader';
+import AppHeader, { type ViewMode } from '@/components/AppHeader';
 import FolderSidebar from '@/components/FolderSidebar';
 import SearchBar from '@/components/SearchBar';
 import PhotoGrid from '@/components/PhotoGrid';
+import PhotoMap from '@/components/PhotoMap';
 import PhotoViewer from '@/components/PhotoViewer';
 import { mockPhotos, mockFolderTree, type Photo } from '@/lib/mock-data';
 
@@ -11,6 +12,7 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   const filteredPhotos = useMemo(() => {
     let photos = mockPhotos;
@@ -36,7 +38,11 @@ export default function Index() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <AppHeader onToggleSidebar={() => setSidebarOpen(true)} />
+      <AppHeader
+        onToggleSidebar={() => setSidebarOpen(true)}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
       <div className="flex flex-1 min-h-0">
         <FolderSidebar
           folders={mockFolderTree}
@@ -54,7 +60,11 @@ export default function Index() {
             />
           </div>
           <div className="flex-1 overflow-y-auto scrollbar-thin px-3 sm:px-5 pb-6">
-            <PhotoGrid photos={filteredPhotos} onSelect={setSelectedPhoto} />
+            {viewMode === 'grid' ? (
+              <PhotoGrid photos={filteredPhotos} onSelect={setSelectedPhoto} />
+            ) : (
+              <PhotoMap photos={filteredPhotos} onSelect={setSelectedPhoto} />
+            )}
           </div>
         </main>
       </div>
