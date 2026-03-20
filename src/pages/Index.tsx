@@ -88,7 +88,7 @@ export default function Index() {
               resultCount={filteredPhotos.length}
             />
           </div>
-          <div className="flex-1 overflow-y-auto scrollbar-thin px-3 sm:px-5 pb-6">
+          <div className="flex-1 min-h-0 px-3 sm:px-5 pb-2">
             {viewMode === 'grid' ? (
               <PhotoGrid photos={filteredPhotos} onSelect={setSelectedPhoto} />
             ) : viewMode === 'map' ? (
