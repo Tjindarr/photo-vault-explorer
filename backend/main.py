@@ -78,7 +78,7 @@ def list_photos(
     date_from: str = Query(None, description="Filter from date (ISO format)"),
     date_to: str = Query(None, description="Filter to date (ISO format)"),
     type: str = Query(None, description="Filter by type: image or video"),
-    limit: int = Query(200, ge=1, le=1000),
+    limit: int = Query(200, ge=1, le=50000),
     offset: int = Query(0, ge=0),
 ):
     photos, total = search_photos(
