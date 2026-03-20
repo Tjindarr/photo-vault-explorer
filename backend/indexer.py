@@ -56,9 +56,6 @@ def extract_exif(filepath: str) -> dict:
         if suffix not in (".jpg", ".jpeg", ".tiff", ".tif"):
             return _extract_exif_with_pillow(filepath, meta)
 
-        if
-            return _extract_exif_with_pillow(filepath, meta)
-
         with open(filepath, "rb") as f:
             tags = exifread.process_file(f, details=False)
 
