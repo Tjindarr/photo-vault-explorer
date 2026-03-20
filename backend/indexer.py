@@ -258,14 +258,13 @@ def generate_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
         return None
 
 
-def scan_directory(photos_dir: str = PHOTOS_DIR) -> list[dict]:
-    """Scan directory recursively and return photo metadata dicts."""
-    results = []
+def scan_directory(photos_dir: str = PHOTOS_DIR):
+    """Scan directory recursively and yield photo metadata dicts one at a time."""
     photos_path = Path(photos_dir)
 
     if not photos_path.exists():
         logger.warning(f"Photos directory does not exist: {photos_dir}")
-        return results
+        return
 
     for filepath in photos_path.rglob("*"):
         if not filepath.is_file():
@@ -280,7 +279,12 @@ def scan_directory(photos_dir: str = PHOTOS_DIR) -> list[dict]:
         if folder == ".":
             folder = "Root"
 
-        file_stat = filepath.stat()
+        try:
+            file_stat = filepath.stat()
+        except OSError as e:
+            logger.warning(f"Cannot stat {filepath}: {e}")
+            continue
+
         fhash = file_hash(str(filepath))
         photo_id = hashlib.md5(rel_path.encode()).hexdigest()[:16]
         is_video = ext in VIDEO_EXTENSIONS
@@ -299,7 +303,7 @@ def scan_directory(photos_dir: str = PHOTOS_DIR) -> list[dict]:
         if not is_video:
             thumb_path = generate_thumbnail(str(filepath), photo_id)
 
-        results.append({
+        yield {
             "id": photo_id,
             "filename": filepath.name,
             "path": rel_path,
@@ -320,6 +324,4 @@ def scan_directory(photos_dir: str = PHOTOS_DIR) -> list[dict]:
             "thumbnail_path": thumb_path,
             "file_hash": fhash,
             "file_modified_at": datetime.fromtimestamp(file_stat.st_mtime).isoformat(),
-        })
-
-    return results
+        }
