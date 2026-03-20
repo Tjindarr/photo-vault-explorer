@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import AppHeader, { type ViewMode } from '@/components/AppHeader';
 import FolderSidebar from '@/components/FolderSidebar';
 import SearchBar from '@/components/SearchBar';
