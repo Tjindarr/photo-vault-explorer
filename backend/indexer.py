@@ -344,9 +344,11 @@ def scan_directory(photos_dir: str = PHOTOS_DIR):
         if not meta.get("date_taken"):
             meta["date_taken"] = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
 
-        # Generate thumbnail for images
+        # Generate thumbnail
         thumb_path = None
-        if not is_video:
+        if is_video:
+            thumb_path = generate_video_thumbnail(str(filepath), photo_id)
+        else:
             thumb_path = generate_thumbnail(str(filepath), photo_id)
 
         yield {
