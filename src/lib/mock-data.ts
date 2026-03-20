@@ -53,7 +53,7 @@ function seededRandom(seed: number) {
   return x - Math.floor(x);
 }
 
-export const mockPhotos: Photo[] = Array.from({ length: 120 }, (_, i) => {
+export const mockPhotos: Photo[] = Array.from({ length: 2000 }, (_, i) => {
   const r = seededRandom(i + 1);
   const r2 = seededRandom(i + 100);
   const r3 = seededRandom(i + 200);

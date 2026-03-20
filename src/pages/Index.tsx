@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import AppHeader, { type ViewMode } from '@/components/AppHeader';
 import FolderSidebar from '@/components/FolderSidebar';
 import SearchBar from '@/components/SearchBar';
@@ -88,7 +89,10 @@ export default function Index() {
               resultCount={filteredPhotos.length}
             />
           </div>
-          <div className="flex-1 overflow-y-auto scrollbar-thin px-3 sm:px-5 pb-6">
+          <div className={cn(
+            "flex-1 min-h-0 px-3 sm:px-5",
+            viewMode !== 'grid' && "overflow-y-auto scrollbar-thin pb-6"
+          )}>
             {viewMode === 'grid' ? (
               <PhotoGrid photos={filteredPhotos} onSelect={setSelectedPhoto} />
             ) : viewMode === 'map' ? (
