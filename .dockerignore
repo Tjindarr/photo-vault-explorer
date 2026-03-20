@@ -1,0 +1,10 @@
+# SnapVault Docker ignore
+node_modules
+.git
+*.md
+.env
+.vscode
+.idea
+dist
+backend/__pycache__
+backend/*.pyc

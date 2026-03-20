@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import AppHeader, { type ViewMode } from '@/components/AppHeader';
 import FolderSidebar from '@/components/FolderSidebar';
@@ -8,7 +8,8 @@ import PhotoMap from '@/components/PhotoMap';
 import StatsDashboard from '@/components/StatsDashboard';
 import PhotoViewer from '@/components/PhotoViewer';
 import TimelineSlider from '@/components/TimelineSlider';
-import { mockPhotos, mockFolderTree, type Photo } from '@/lib/mock-data';
+import { type Photo, type Folder } from '@/lib/mock-data';
+import { fetchPhotos, fetchFolders, isApiAvailable } from '@/lib/api-client';
 
 export default function Index() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
@@ -18,8 +19,36 @@ export default function Index() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [dateRange, setDateRange] = useState<[Date, Date] | null>(null);
 
+  const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [usingApi, setUsingApi] = useState(false);
+
+  // Load photos and folders
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const apiReady = await isApiAvailable();
+      setUsingApi(apiReady);
+
+      const [photosResult, foldersResult] = await Promise.all([
+        fetchPhotos({ limit: 10000 }),
+        fetchFolders(),
+      ]);
+      setAllPhotos(photosResult.items);
+      setFolders(foldersResult);
+    } catch (e) {
+      console.error('Failed to load data:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Client-side filtering (works for both mock and API data)
   const filteredPhotos = useMemo(() => {
-    let photos = mockPhotos;
+    let photos = allPhotos;
 
     if (selectedFolder) {
       photos = photos.filter((p) => p.folder.startsWith(selectedFolder));
@@ -46,11 +75,10 @@ export default function Index() {
     }
 
     return photos;
-  }, [selectedFolder, searchQuery, dateRange]);
+  }, [allPhotos, selectedFolder, searchQuery, dateRange]);
 
-  // Photos before date filter (for the timeline histogram)
   const photosBeforeDateFilter = useMemo(() => {
-    let photos = mockPhotos;
+    let photos = allPhotos;
     if (selectedFolder) photos = photos.filter((p) => p.folder.startsWith(selectedFolder));
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -64,7 +92,7 @@ export default function Index() {
       );
     }
     return photos;
-  }, [selectedFolder, searchQuery]);
+  }, [allPhotos, selectedFolder, searchQuery]);
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -75,7 +103,7 @@ export default function Index() {
       />
       <div className="flex flex-1 min-h-0">
         <FolderSidebar
-          folders={mockFolderTree}
+          folders={folders}
           selectedFolder={selectedFolder}
           onSelectFolder={setSelectedFolder}
           open={sidebarOpen}
@@ -93,7 +121,14 @@ export default function Index() {
             "flex-1 min-h-0 px-3 sm:px-5",
             viewMode !== 'grid' && "overflow-y-auto scrollbar-thin pb-6"
           )}>
-            {viewMode === 'grid' ? (
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center fade-in">
+                  <div className="w-8 h-8 rounded-full border-2 border-muted-foreground/20 border-t-primary animate-spin mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">Loading library...</p>
+                </div>
+              </div>
+            ) : viewMode === 'grid' ? (
               <PhotoGrid photos={filteredPhotos} onSelect={setSelectedPhoto} />
             ) : viewMode === 'map' ? (
               <PhotoMap photos={filteredPhotos} onSelect={setSelectedPhoto} />
