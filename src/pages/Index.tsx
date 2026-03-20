@@ -4,6 +4,7 @@ import FolderSidebar from '@/components/FolderSidebar';
 import SearchBar from '@/components/SearchBar';
 import PhotoGrid from '@/components/PhotoGrid';
 import PhotoMap from '@/components/PhotoMap';
+import StatsDashboard from '@/components/StatsDashboard';
 import PhotoViewer from '@/components/PhotoViewer';
 import TimelineSlider from '@/components/TimelineSlider';
 import { mockPhotos, mockFolderTree, type Photo } from '@/lib/mock-data';
@@ -90,8 +91,10 @@ export default function Index() {
           <div className="flex-1 overflow-y-auto scrollbar-thin px-3 sm:px-5 pb-6">
             {viewMode === 'grid' ? (
               <PhotoGrid photos={filteredPhotos} onSelect={setSelectedPhoto} />
-            ) : (
+            ) : viewMode === 'map' ? (
               <PhotoMap photos={filteredPhotos} onSelect={setSelectedPhoto} />
+            ) : (
+              <StatsDashboard photos={filteredPhotos} />
             )}
           </div>
           <TimelineSlider

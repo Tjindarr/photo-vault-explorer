@@ -1,13 +1,19 @@
-import { Camera, PanelLeft, LayoutGrid, Map } from 'lucide-react';
+import { Camera, PanelLeft, LayoutGrid, Map, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type ViewMode = 'grid' | 'map';
+export type ViewMode = 'grid' | 'map' | 'stats';
 
 interface AppHeaderProps {
   onToggleSidebar: () => void;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
 }
+
+const views: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
+  { mode: 'grid', icon: LayoutGrid, label: 'Grid view' },
+  { mode: 'map', icon: Map, label: 'Map view' },
+  { mode: 'stats', icon: BarChart3, label: 'Stats' },
+];
 
 export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange }: AppHeaderProps) {
   return (
@@ -28,32 +34,22 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
 
       <div className="flex-1" />
 
-      {/* View toggle */}
       <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
-        <button
-          onClick={() => onViewModeChange('grid')}
-          className={cn(
-            'p-1.5 rounded-md transition-all duration-150 active:scale-95',
-            viewMode === 'grid'
-              ? 'bg-surface shadow-sm text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-          aria-label="Grid view"
-        >
-          <LayoutGrid className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={() => onViewModeChange('map')}
-          className={cn(
-            'p-1.5 rounded-md transition-all duration-150 active:scale-95',
-            viewMode === 'map'
-              ? 'bg-surface shadow-sm text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-          aria-label="Map view"
-        >
-          <Map className="h-3.5 w-3.5" />
-        </button>
+        {views.map(({ mode, icon: Icon, label }) => (
+          <button
+            key={mode}
+            onClick={() => onViewModeChange(mode)}
+            className={cn(
+              'p-1.5 rounded-md transition-all duration-150 active:scale-95',
+              viewMode === mode
+                ? 'bg-surface shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+            aria-label={label}
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </button>
+        ))}
       </div>
 
       <span className="text-xs text-muted-foreground hidden sm:block">Read-only viewer</span>
