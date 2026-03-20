@@ -19,23 +19,25 @@ indexing_status = {"running": False, "progress": 0, "total": 0, "last_run": None
 
 
 def run_indexer():
-    """Background indexing task."""
+    """Background indexing task — saves each photo immediately as it's found."""
     indexing_status["running"] = True
     indexing_status["progress"] = 0
+    indexing_status["total"] = 0
     logger.info(f"Starting index scan of {PHOTOS_DIR}...")
 
     try:
-        photos = scan_directory()
-        indexing_status["total"] = len(photos)
-
         existing_paths = set()
-        for i, photo in enumerate(photos):
+        count = 0
+
+        for photo in scan_directory():
             upsert_photo(photo)
             existing_paths.add(photo["path"])
-            indexing_status["progress"] = i + 1
+            count += 1
+            indexing_status["progress"] = count
+            indexing_status["total"] = count
 
-            if (i + 1) % 100 == 0:
-                logger.info(f"Indexed {i + 1}/{len(photos)} files...")
+            if count % 100 == 0:
+                logger.info(f"Indexed {count} files so far...")
 
         # Clean up removed files
         removed = remove_missing_photos(existing_paths)
@@ -43,7 +45,7 @@ def run_indexer():
             logger.info(f"Removed {removed} entries for deleted files")
 
         indexing_status["last_run"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-        logger.info(f"Indexing complete: {len(photos)} files indexed")
+        logger.info(f"Indexing complete: {count} files indexed")
 
     except Exception as e:
         logger.error(f"Indexing failed: {e}")
