@@ -10,7 +10,7 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes
+from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 
 logger = logging.getLogger("snapvault")
@@ -86,6 +86,22 @@ def run_indexer():
         indexing_status["running"] = False
 
 
+def purge_stale_photos(paths: list[str]) -> list[dict]:
+    """Delete stale DB rows and cached files for media paths that no longer exist."""
+    removed = remove_photos_by_paths(paths)
+    for entry in removed:
+        if entry.get("thumbnail_path"):
+            thumb_file = os.path.join(THUMB_DIR, entry["thumbnail_path"])
+            if os.path.exists(thumb_file):
+                os.remove(thumb_file)
+
+        transcode_file = os.path.join(TRANSCODE_DIR, f"{entry['id']}.mp4")
+        if os.path.exists(transcode_file):
+            os.remove(transcode_file)
+
+    return removed
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: init DB and run initial index
@@ -120,6 +136,15 @@ def list_photos(
         query=q, folder=folder, date_from=date_from, date_to=date_to,
         photo_type=type, limit=limit, offset=offset,
     )
+
+    stale_paths = [
+        p["path"] for p in photos
+        if not os.path.exists(os.path.join(PHOTOS_DIR, p["path"]))
+    ]
+    if stale_paths:
+        purge_stale_photos(stale_paths)
+        photos = [p for p in photos if p["path"] not in set(stale_paths)]
+        total = max(0, total - len(set(stale_paths)))
 
     # Format for frontend
     items = []
@@ -162,6 +187,12 @@ def get_photo(photo_id: str):
     photo = get_photo_by_id(photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
+
+    filepath = os.path.join(PHOTOS_DIR, photo["path"])
+    if not os.path.exists(filepath):
+        purge_stale_photos([photo["path"]])
+        raise HTTPException(status_code=404, detail="Photo not found")
+
     return photo
 
 
@@ -173,6 +204,7 @@ def get_thumbnail(photo_id: str):
 
     filepath = os.path.join(PHOTOS_DIR, photo["path"])
     if not os.path.exists(filepath):
+        purge_stale_photos([photo["path"]])
         raise HTTPException(status_code=404, detail="File not found on disk")
 
     thumb_path = None
@@ -231,6 +263,7 @@ def get_media(photo_id: str):
 
     filepath = os.path.join(PHOTOS_DIR, photo["path"])
     if not os.path.exists(filepath):
+        purge_stale_photos([photo["path"]])
         raise HTTPException(status_code=404, detail="File not found on disk")
 
     ext = os.path.splitext(filepath)[1].lower()
