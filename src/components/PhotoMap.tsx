@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Photo } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
 
 // Fix default marker icons for Leaflet + bundlers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -26,18 +25,21 @@ interface ClusterGroup {
 }
 
 export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
-  const [hoveredCluster, setHoveredCluster] = useState<string | null>(null);
-
-  // Group photos by location
   const clusters = useMemo(() => {
     const map = new Map<string, ClusterGroup>();
     for (const photo of photos) {
       const { gpsLat, gpsLng, location } = photo.metadata;
-      if (gpsLat == null || gpsLng == null || !location) continue;
-      if (!map.has(location)) {
-        map.set(location, { lat: gpsLat, lng: gpsLng, location, photos: [] });
+      if (gpsLat == null || gpsLng == null) continue;
+
+      const clusterLabel = location?.trim() || `${gpsLat.toFixed(5)}, ${gpsLng.toFixed(5)}`;
+      const clusterKey = location?.trim()
+        ? `location:${location.trim()}`
+        : `coords:${gpsLat.toFixed(5)},${gpsLng.toFixed(5)}`;
+
+      if (!map.has(clusterKey)) {
+        map.set(clusterKey, { lat: gpsLat, lng: gpsLng, location: clusterLabel, photos: [] });
       }
-      map.get(location)!.photos.push(photo);
+      map.get(clusterKey)!.photos.push(photo);
     }
     return Array.from(map.values());
   }, [photos]);
@@ -80,11 +82,11 @@ export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           />
           {clusters.map((cluster) => (
-            <Marker key={cluster.location} position={[cluster.lat, cluster.lng]}>
+            <Marker key={`${cluster.location}-${cluster.lat}-${cluster.lng}`} position={[cluster.lat, cluster.lng]}>
               <Popup maxWidth={280} minWidth={200}>
                 <div className="font-sans">
                   <p className="font-semibold text-sm mb-1" style={{ margin: 0 }}>{cluster.location}</p>
-                  <p className="text-xs text-gray-500 mb-2" style={{ margin: '0 0 8px 0' }}>{cluster.photos.length} photos</p>
+                  <p className="text-xs text-muted-foreground mb-2" style={{ margin: '0 0 8px 0' }}>{cluster.photos.length} photos</p>
                   <div className="grid grid-cols-3 gap-1">
                     {cluster.photos.slice(0, 6).map((photo) => (
                       <button
@@ -101,7 +103,7 @@ export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
                     ))}
                   </div>
                   {cluster.photos.length > 6 && (
-                    <p className="text-xs text-gray-400 mt-1 text-center" style={{ margin: '6px 0 0 0' }}>
+                    <p className="text-xs text-muted-foreground mt-1 text-center" style={{ margin: '6px 0 0 0' }}>
                       +{cluster.photos.length - 6} more
                     </p>
                   )}
