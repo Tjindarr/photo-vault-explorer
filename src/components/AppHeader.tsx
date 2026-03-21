@@ -85,30 +85,27 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
   };
 
   return (
-    <header className="shrink-0 border-b border-border bg-surface">
+    <header className="shrink-0 border-b border-border bg-surface" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="h-12 flex items-center px-3 sm:px-4 gap-2 sm:gap-3">
         <button
           onClick={onToggleSidebar}
-          className="p-1.5 rounded-md hover:bg-secondary transition-colors active:scale-95 lg:hidden"
+          className="p-2 rounded-md hover:bg-secondary transition-colors active:scale-95 lg:hidden"
           aria-label="Toggle folders"
         >
-          <PanelLeft className="h-4.5 w-4.5 text-muted-foreground" />
+          <PanelLeft className="h-5 w-5 text-muted-foreground" />
         </button>
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
             <Camera className="h-4 w-4 text-primary-foreground" />
           </div>
-          <h1 className="text-sm font-semibold text-foreground tracking-tight">ImgVault</h1>
+          <h1 className="text-sm font-semibold text-foreground tracking-tight hidden sm:block">ImgVault</h1>
         </div>
 
         {indexStatus.running && (
-          <div className="flex items-center gap-2 ml-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 ml-1 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin text-primary" />
-            <span className="hidden sm:inline tabular-nums">
-              Indexing… {indexStatus.progress.toLocaleString()} photos
-            </span>
-            <span className="sm:hidden tabular-nums">
-              {indexStatus.progress.toLocaleString()}
+            <span className="tabular-nums">
+              <span className="hidden sm:inline">Indexing… </span>{indexStatus.progress.toLocaleString()}
             </span>
           </div>
         )}
@@ -127,10 +124,11 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
           aria-label="Reindex all files"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', (indexStatus.running || reindexing) && 'animate-spin')} />
-          <span className="hidden sm:inline">Reindex all</span>
+          <span className="hidden sm:inline">Reindex</span>
         </button>
 
-        <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+        {/* Desktop-only view switcher */}
+        <div className="hidden lg:flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {views.map(({ mode, icon: Icon, label }) => (
             <button
               key={mode}
@@ -150,10 +148,10 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
 
         <button
           onClick={toggle}
-          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
+          className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
           aria-label="Toggle theme"
         >
-          {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
       </div>
 
