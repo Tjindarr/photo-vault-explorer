@@ -2,6 +2,8 @@ import os
 import time
 import logging
 import threading
+import subprocess
+from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query, HTTPException
