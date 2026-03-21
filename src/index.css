@@ -113,20 +113,12 @@
 }
 
 .app-shell {
-  height: 100vh;
-  height: 100dvh;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: var(--app-height, 100vh);
 }
 
-@supports (-webkit-touch-callout: none) {
-  html, body, #root {
-    height: -webkit-fill-available;
-  }
-
+@supports (height: 100dvh) {
   .app-shell {
-    height: -webkit-fill-available;
-    min-height: -webkit-fill-available;
+    height: var(--app-height, 100dvh);
   }
 }
 
