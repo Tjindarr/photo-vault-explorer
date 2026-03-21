@@ -127,6 +127,20 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
           <span className="hidden sm:inline">Reindex</span>
         </button>
 
+        {/* Stats button — always visible */}
+        <button
+          onClick={() => onViewModeChange('stats')}
+          className={cn(
+            'p-2 rounded-md transition-colors active:scale-95',
+            viewMode === 'stats'
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
+          )}
+          aria-label="Stats"
+        >
+          <BarChart3 className="h-4 w-4" />
+        </button>
+
         {/* Desktop-only view switcher */}
         <div className="hidden lg:flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {views.map(({ mode, icon: Icon, label }) => (
