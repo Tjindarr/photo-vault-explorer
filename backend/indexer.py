@@ -197,10 +197,39 @@ def _extract_exif_with_pillow(filepath: str, meta: dict) -> dict:
             except (TypeError, ValueError, ZeroDivisionError):
                 pass
 
+        # GPS data from IFD
+        try:
+            gps_ifd = exif.get_ifd(ExifTags.IFD.GPSInfo)
+            if gps_ifd:
+                gps_by_name = {
+                    ExifTags.GPSTAGS.get(k, str(k)): v
+                    for k, v in gps_ifd.items()
+                }
+                lat = gps_by_name.get("GPSLatitude")
+                lat_ref = gps_by_name.get("GPSLatitudeRef")
+                lng = gps_by_name.get("GPSLongitude")
+                lng_ref = gps_by_name.get("GPSLongitudeRef")
+                if lat and lat_ref and lng and lng_ref:
+                    meta["gps_lat"] = _pillow_gps_to_decimal(lat, lat_ref)
+                    meta["gps_lng"] = _pillow_gps_to_decimal(lng, lng_ref)
+        except Exception:
+            pass
+
     except Exception as e:
         logger.warning(f"HEIC EXIF extraction failed for {filepath}: {e}")
 
     return meta
+
+
+def _pillow_gps_to_decimal(coords, ref: str) -> float:
+    """Convert Pillow GPS tuple (degrees, minutes, seconds) to decimal."""
+    d = float(coords[0])
+    m = float(coords[1])
+    s = float(coords[2])
+    decimal = d + m / 60.0 + s / 3600.0
+    if ref in ("S", "W"):
+        decimal = -decimal
+    return decimal
 
 
 def _extract_gps(tags: dict) -> tuple[Optional[float], Optional[float]]:
