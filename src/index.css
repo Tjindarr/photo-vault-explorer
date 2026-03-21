@@ -115,12 +115,13 @@
 }
 
 .app-shell {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
 }
 
 @supports (-webkit-touch-callout: none) {
   .app-shell {
+    height: -webkit-fill-available;
     min-height: -webkit-fill-available;
   }
 }
