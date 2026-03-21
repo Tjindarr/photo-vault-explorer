@@ -8,7 +8,7 @@ import PhotoMap from '@/components/PhotoMap';
 import StatsDashboard from '@/components/StatsDashboard';
 import PhotoViewer from '@/components/PhotoViewer';
 import { type Photo, type Folder } from '@/lib/mock-data';
-import { fetchPhotos, fetchFolders, fetchStats, isApiAvailable } from '@/lib/api-client';
+import { fetchPhotos, fetchFolders, fetchMapPhotos, fetchStats, isApiAvailable } from '@/lib/api-client';
 
 const PAGE_SIZE = 500;
 
@@ -20,6 +20,7 @@ export default function Index() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [mapPhotos, setMapPhotos] = useState<Photo[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -50,6 +51,9 @@ export default function Index() {
       const result = await fetchPhotos({ ...apiParams, limit: PAGE_SIZE, offset: 0 });
       setPhotos(result.items);
       setTotalCount(result.total);
+
+      const mapResult = await fetchMapPhotos({ ...apiParams, limit: 20000 });
+      setMapPhotos(mapResult.items);
     } catch (e) {
       console.error('Failed to load photos:', e);
     } finally {
@@ -146,7 +150,7 @@ export default function Index() {
                 onLoadMore={loadMore}
               />
             ) : viewMode === 'map' ? (
-              <PhotoMap photos={photos} onSelect={setSelectedPhoto} />
+              <PhotoMap photos={mapPhotos} onSelect={setSelectedPhoto} />
             ) : (
               <StatsDashboard stats={stats} />
             )}
