@@ -24,11 +24,11 @@ function useTheme() {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem('snapvault-theme', next ? 'dark' : 'light');
+    localStorage.setItem('imgvault-theme', next ? 'dark' : 'light');
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem('snapvault-theme');
+    const saved = localStorage.getItem('imgvault-theme');
     if (saved === 'light') {
       setDark(false);
       document.documentElement.classList.remove('dark');
@@ -96,7 +96,7 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
             <Camera className="h-4 w-4 text-primary-foreground" />
           </div>
-          <h1 className="text-sm font-semibold text-foreground tracking-tight">SnapVault</h1>
+          <h1 className="text-sm font-semibold text-foreground tracking-tight">ImgVault</h1>
         </div>
 
         {indexStatus.running && (
