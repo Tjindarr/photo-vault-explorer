@@ -1,13 +1,22 @@
-import { useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { MapPin, Camera, Calendar, Film, Image } from 'lucide-react';
-import type { Photo } from '@/lib/mock-data';
+
+interface StatsData {
+  total: number;
+  images: number;
+  videos: number;
+  totalSize: number;
+  locations: number;
+  byCamera: { name: string; count: number }[];
+  byLocation: { name: string; count: number }[];
+  byYear: { name: string; count: number }[];
+}
 
 interface StatsDashboardProps {
-  photos: Photo[];
+  stats: StatsData | null;
 }
 
 const COLORS = [
@@ -20,17 +29,6 @@ const COLORS = [
   'hsl(30, 80%, 50%)',
   'hsl(100, 50%, 42%)',
 ];
-
-function countBy<T>(items: T[], keyFn: (item: T) => string | undefined): { name: string; count: number }[] {
-  const map = new Map<string, number>();
-  for (const item of items) {
-    const key = keyFn(item) || 'Unknown';
-    map.set(key, (map.get(key) || 0) + 1);
-  }
-  return Array.from(map.entries())
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
-}
 
 function StatCard({ icon: Icon, label, value }: { icon: typeof Camera; label: string; value: string | number }) {
   return (
@@ -65,52 +63,53 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export default function StatsDashboard({ photos }: StatsDashboardProps) {
-  const byLocation = useMemo(() => countBy(photos, (p) => p.metadata.location), [photos]);
-  const byCamera = useMemo(() => countBy(photos, (p) => p.metadata.camera), [photos]);
-  const byYear = useMemo(() =>
-    countBy(photos, (p) => p.metadata.dateTaken ? new Date(p.metadata.dateTaken).getFullYear().toString() : undefined)
-      .sort((a, b) => a.name.localeCompare(b.name)),
-    [photos],
-  );
-  const byType = useMemo(() => countBy(photos, (p) => p.type === 'video' ? 'Video' : 'Photo'), [photos]);
+function formatSize(bytes: number): string {
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
 
-  const totalSize = useMemo(() => {
-    const bytes = photos.reduce((sum, p) => sum + p.fileSize, 0);
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-  }, [photos]);
+export default function StatsDashboard({ stats }: StatsDashboardProps) {
+  if (!stats) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center fade-in">
+          <div className="w-8 h-8 rounded-full border-2 border-muted-foreground/20 border-t-primary animate-spin mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Loading stats...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const locationCount = new Set(photos.map((p) => p.metadata.location).filter(Boolean)).size;
-
-  if (photos.length === 0) {
+  if (stats.total === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center fade-in">
         <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
           <Calendar className="h-7 w-7 text-muted-foreground" />
         </div>
         <p className="text-foreground font-medium mb-1">No data to show</p>
-        <p className="text-sm text-muted-foreground">Adjust your filters to see stats.</p>
+        <p className="text-sm text-muted-foreground">Index some photos first.</p>
       </div>
     );
   }
 
+  const byType = [
+    { name: 'Photo', count: stats.images },
+    { name: 'Video', count: stats.videos },
+  ].filter(t => t.count > 0);
+
   return (
     <div className="space-y-5 fade-in-up">
-      {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard icon={Image} label="Total photos" value={photos.filter((p) => p.type === 'image').length} />
-        <StatCard icon={Film} label="Total videos" value={photos.filter((p) => p.type === 'video').length} />
-        <StatCard icon={MapPin} label="Locations" value={locationCount} />
-        <StatCard icon={Camera} label="Total size" value={totalSize} />
+        <StatCard icon={Image} label="Total photos" value={stats.images} />
+        <StatCard icon={Film} label="Total videos" value={stats.videos} />
+        <StatCard icon={MapPin} label="Locations" value={stats.locations} />
+        <StatCard icon={Camera} label="Total size" value={formatSize(stats.totalSize)} />
       </div>
 
-      {/* Charts grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* By Year */}
         <ChartCard title="Photos by Year">
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byYear} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <BarChart data={stats.byYear} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.5)' }} />
@@ -120,11 +119,10 @@ export default function StatsDashboard({ photos }: StatsDashboardProps) {
           </div>
         </ChartCard>
 
-        {/* By Location */}
         <ChartCard title="Photos by Location">
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byLocation} layout="vertical" margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <BarChart data={stats.byLocation.slice(0, 10)} layout="vertical" margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.5)' }} />
@@ -134,13 +132,12 @@ export default function StatsDashboard({ photos }: StatsDashboardProps) {
           </div>
         </ChartCard>
 
-        {/* By Camera */}
         <ChartCard title="Photos by Camera">
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={byCamera}
+                  data={stats.byCamera.slice(0, 8)}
                   cx="50%"
                   cy="50%"
                   innerRadius={45}
@@ -150,7 +147,7 @@ export default function StatsDashboard({ photos }: StatsDashboardProps) {
                   nameKey="name"
                   stroke="none"
                 >
-                  {byCamera.map((_, i) => (
+                  {stats.byCamera.slice(0, 8).map((_: any, i: number) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
@@ -172,12 +169,11 @@ export default function StatsDashboard({ photos }: StatsDashboardProps) {
           </div>
         </ChartCard>
 
-        {/* By Type */}
         <ChartCard title="File Types">
           <div className="h-52 flex items-center justify-center">
             <div className="flex gap-8">
               {byType.map((item, i) => {
-                const pct = Math.round((item.count / photos.length) * 100);
+                const pct = Math.round((item.count / stats.total) * 100);
                 return (
                   <div key={item.name} className="text-center">
                     <div className="relative w-24 h-24 mx-auto mb-2">
