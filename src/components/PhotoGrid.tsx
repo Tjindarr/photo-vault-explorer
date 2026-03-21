@@ -149,7 +149,7 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
       if (row.type === 'header') return HEADER_HEIGHT;
       return getThumbSize() + GAP;
     },
-    onChange: [rows.length],
+    overscan: 8,
   });
 
   // Infinite scroll: load more when near bottom
