@@ -7,6 +7,9 @@ import type { Photo } from '@/lib/mock-data';
 interface PhotoGridProps {
   photos: Photo[];
   onSelect: (photo: Photo) => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 // A row is either a date header or a row of photo thumbnails
