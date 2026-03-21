@@ -45,12 +45,9 @@ function buildRows(photos: Photo[], cols: number): GridRow[] {
 
 function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo) => void }) {
   const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  // Fall back to full image if no thumbnail, then to nothing
-  const imgSrc = error
-    ? (photo.thumbnailUrl ? photo.fullUrl : null)
-    : (photo.thumbnailUrl || photo.fullUrl);
+  const imgSrc = failed ? null : (photo.thumbnailUrl || photo.fullUrl);
 
   return (
     <button
@@ -58,16 +55,13 @@ function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo
       className="group relative overflow-hidden bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 outline-none active:scale-[0.97] transition-transform duration-150"
       style={{ borderRadius: 'var(--thumb-radius)', aspectRatio: '1' }}
     >
-      {imgSrc ? (
+      {imgSrc && !failed ? (
         <img
           src={imgSrc}
           alt={photo.filename}
           loading="lazy"
           onLoad={() => setLoaded(true)}
-          onError={() => {
-            if (!error) setError(true);
-            else setLoaded(true); // give up, show placeholder
-          }}
+          onError={() => setFailed(true)}
           className={cn(
             'absolute inset-0 w-full h-full object-cover transition-all duration-500',
             loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105',
@@ -75,9 +69,9 @@ function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo
           )}
         />
       ) : null}
-      {(!loaded || !imgSrc) && (
+      {(!loaded || failed || !imgSrc) && (
         <div className="absolute inset-0 bg-muted flex items-center justify-center">
-          {!imgSrc || error ? (
+          {failed || !imgSrc ? (
             <span className="text-[10px] text-muted-foreground truncate px-2">{photo.filename}</span>
           ) : (
             <div className="w-full h-full animate-pulse bg-muted" />
