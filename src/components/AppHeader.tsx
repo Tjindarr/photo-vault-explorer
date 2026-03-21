@@ -96,7 +96,7 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
             <Camera className="h-4 w-4 text-primary-foreground" />
           </div>
-          <h1 className="text-sm font-semibold text-foreground tracking-tight">SnapVault</h1>
+          <h1 className="text-sm font-semibold text-foreground tracking-tight">ImgVault</h1>
         </div>
 
         {indexStatus.running && (
