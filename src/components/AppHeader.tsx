@@ -1,4 +1,4 @@
-import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw, Copy, Trash2 } from 'lucide-react';
+import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw, Copy, Trash2, ImageIcon, Film, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, useCallback } from 'react';
 import { fetchIndexStatus, triggerReindex } from '@/lib/api-client';
@@ -9,6 +9,12 @@ interface AppHeaderProps {
   onToggleSidebar: () => void;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
+  typeFilter?: string | null;
+  onTypeFilterChange?: (type: string | null) => void;
+  deleteMode?: boolean;
+  onDeleteModeChange?: (on: boolean) => void;
+  selectedCount?: number;
+  onDeleteSelected?: () => void;
 }
 
 const views: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
@@ -66,7 +72,7 @@ function useIndexStatus() {
   return { status, refresh: poll };
 }
 
-export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange }: AppHeaderProps) {
+export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange, typeFilter, onTypeFilterChange, deleteMode, onDeleteModeChange, selectedCount = 0, onDeleteSelected }: AppHeaderProps) {
   const { dark, toggle } = useTheme();
   const { status: indexStatus, refresh } = useIndexStatus();
   const [reindexing, setReindexing] = useState(false);
@@ -108,6 +114,59 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
               <span className="hidden sm:inline">Indexing… </span>{indexStatus.progress.toLocaleString()}
             </span>
           </div>
+        )}
+
+        {/* Type filter toggles — grid/map only */}
+        {(viewMode === 'grid' || viewMode === 'map') && onTypeFilterChange && (
+          <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5 ml-1">
+            <button
+              onClick={() => onTypeFilterChange(null)}
+              className={cn(
+                'px-2 py-1 rounded-md text-xs font-medium transition-colors active:scale-95',
+                !typeFilter ? 'bg-surface shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >All</button>
+            <button
+              onClick={() => onTypeFilterChange(typeFilter === 'image' ? null : 'image')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors active:scale-95',
+                typeFilter === 'image' ? 'bg-surface shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+              aria-label="Photos only"
+            ><ImageIcon className="h-3.5 w-3.5" /></button>
+            <button
+              onClick={() => onTypeFilterChange(typeFilter === 'video' ? null : 'video')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors active:scale-95',
+                typeFilter === 'video' ? 'bg-surface shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+              aria-label="Videos only"
+            ><Film className="h-3.5 w-3.5" /></button>
+          </div>
+        )}
+
+        {/* Delete mode toggle — grid only */}
+        {viewMode === 'grid' && onDeleteModeChange && (
+          <button
+            onClick={() => onDeleteModeChange(!deleteMode)}
+            className={cn(
+              'p-2 rounded-md transition-colors active:scale-95',
+              deleteMode ? 'bg-destructive text-destructive-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
+            )}
+            aria-label="Toggle delete mode"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        )}
+
+        {deleteMode && selectedCount > 0 && onDeleteSelected && (
+          <button
+            onClick={onDeleteSelected}
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-medium active:scale-95"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {selectedCount}
+          </button>
         )}
 
         <div className="flex-1" />
