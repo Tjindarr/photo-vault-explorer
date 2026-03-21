@@ -7,6 +7,7 @@ import PhotoGrid from '@/components/PhotoGrid';
 import PhotoMap from '@/components/PhotoMap';
 import StatsDashboard from '@/components/StatsDashboard';
 import DuplicatesView from '@/components/DuplicatesView';
+import TrashView from '@/components/TrashView';
 import PhotoViewer from '@/components/PhotoViewer';
 import { type Photo, type Folder } from '@/lib/mock-data';
 import { fetchPhotos, fetchFolders, fetchMapPhotos, fetchStats, deletePhotos, isApiAvailable } from '@/lib/api-client';
@@ -137,7 +138,7 @@ export default function Index() {
           <div className={cn(
             "flex-1 min-h-0 px-3 sm:px-5",
             viewMode !== 'grid' && "overflow-y-auto scrollbar-thin pb-6",
-            viewMode === 'duplicates' && "overflow-hidden"
+            (viewMode === 'duplicates' || viewMode === 'trash') && "overflow-hidden"
           )}>
             {loading ? (
               <div className="flex items-center justify-center h-full">
@@ -169,13 +170,13 @@ export default function Index() {
                 }}
                 onDeleteSelected={async () => {
                   if (selectedIds.size === 0) return;
-                  if (!confirm(`Permanently delete ${selectedIds.size} file(s) from disk? This cannot be undone.`)) return;
+                  if (!confirm(`Delete ${selectedIds.size} file(s)? They will be moved to trash.`)) return;
                   try {
                     await deletePhotos(Array.from(selectedIds));
                     setPhotos(prev => prev.filter(p => !selectedIds.has(p.id)));
                     setMapPhotos(prev => prev.filter(p => !selectedIds.has(p.id)));
                     setTotalCount(prev => prev - selectedIds.size);
-                    toast.success(`${selectedIds.size} file(s) deleted`);
+                    toast.success(`${selectedIds.size} file(s) moved to trash`);
                     setSelectedIds(new Set());
                   } catch (e) {
                     toast.error('Failed to delete files');
@@ -186,6 +187,8 @@ export default function Index() {
               <PhotoMap photos={mapPhotos} onSelect={setSelectedPhoto} />
             ) : viewMode === 'duplicates' ? (
               <DuplicatesView onSelect={setSelectedPhoto} />
+            ) : viewMode === 'trash' ? (
+              <TrashView />
             ) : (
               <StatsDashboard stats={stats} />
             )}
@@ -200,13 +203,13 @@ export default function Index() {
           onClose={() => setSelectedPhoto(null)}
           onNavigate={setSelectedPhoto}
           onDelete={async (photo) => {
-            if (!confirm(`Permanently delete "${photo.filename}" from disk? This cannot be undone.`)) return;
+            if (!confirm(`Delete "${photo.filename}"? It will be moved to trash.`)) return;
             try {
               await deletePhotos([photo.id]);
               setPhotos(prev => prev.filter(p => p.id !== photo.id));
               setMapPhotos(prev => prev.filter(p => p.id !== photo.id));
               setTotalCount(prev => prev - 1);
-              toast.success('File deleted');
+              toast.success('Moved to trash');
               // Navigate to next/prev photo or close
               const idx = photos.findIndex(p => p.id === photo.id);
               const remaining = photos.filter(p => p.id !== photo.id);
