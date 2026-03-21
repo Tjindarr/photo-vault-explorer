@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import AppHeader, { type ViewMode } from '@/components/AppHeader';
+import BottomNav from '@/components/BottomNav';
 import FolderSidebar from '@/components/FolderSidebar';
 import SearchBar from '@/components/SearchBar';
 import PhotoGrid from '@/components/PhotoGrid';
@@ -18,6 +19,7 @@ const PAGE_SIZE = 500;
 export default function Index() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -29,7 +31,6 @@ export default function Index() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [usingApi, setUsingApi] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -47,7 +48,8 @@ export default function Index() {
   const apiParams = useMemo(() => ({
     folder: selectedFolder || undefined,
     query: debouncedQuery || undefined,
-  }), [selectedFolder, debouncedQuery]);
+    type: typeFilter || undefined,
+  }), [selectedFolder, debouncedQuery, typeFilter]);
 
   // Load first page when filters change
   const loadPhotos = useCallback(async () => {
@@ -80,11 +82,10 @@ export default function Index() {
     }
   }, [apiParams, photos.length, totalCount, loadingMore]);
 
-  // Initial load + reload on filter changes
+  // Initial load
   useEffect(() => {
     const init = async () => {
-      const apiReady = await isApiAvailable();
-      setUsingApi(apiReady);
+      await isApiAvailable();
       const [, foldersResult] = await Promise.all([
         loadPhotos(),
         fetchFolders(),
@@ -112,6 +113,41 @@ export default function Index() {
     }
   }, [viewMode, stats]);
 
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} file(s)? They will be moved to trash.`)) return;
+    try {
+      await deletePhotos(Array.from(selectedIds));
+      setPhotos(prev => prev.filter(p => !selectedIds.has(p.id)));
+      setMapPhotos(prev => prev.filter(p => !selectedIds.has(p.id)));
+      setTotalCount(prev => prev - selectedIds.size);
+      toast.success(`${selectedIds.size} file(s) moved to trash`);
+      setSelectedIds(new Set());
+    } catch {
+      toast.error('Failed to delete files');
+    }
+  };
+
+  const handleDeleteSingle = async (photo: Photo) => {
+    if (!confirm(`Delete "${photo.filename}"? It will be moved to trash.`)) return;
+    try {
+      await deletePhotos([photo.id]);
+      setPhotos(prev => prev.filter(p => p.id !== photo.id));
+      setMapPhotos(prev => prev.filter(p => p.id !== photo.id));
+      setTotalCount(prev => prev - 1);
+      toast.success('Moved to trash');
+      const idx = photos.findIndex(p => p.id === photo.id);
+      const remaining = photos.filter(p => p.id !== photo.id);
+      if (remaining.length === 0) {
+        setSelectedPhoto(null);
+      } else {
+        setSelectedPhoto(remaining[Math.min(idx, remaining.length - 1)]);
+      }
+    } catch {
+      toast.error('Failed to delete file');
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <AppHeader
@@ -128,19 +164,23 @@ export default function Index() {
           onClose={() => setSidebarOpen(false)}
         />
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className="px-3 sm:px-5 pt-3 sm:pt-4 pb-2 space-y-2">
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              resultCount={totalCount}
-            />
-          </div>
+          {(viewMode === 'grid' || viewMode === 'map') && (
+            <div className="px-3 sm:px-5 pt-3 sm:pt-4 pb-2 space-y-2">
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                resultCount={totalCount}
+                typeFilter={typeFilter}
+                onTypeFilterChange={setTypeFilter}
+              />
+            </div>
+          )}
           <div className={cn(
             "flex-1 min-h-0 px-3 sm:px-5",
             viewMode !== 'grid' && "overflow-y-auto scrollbar-thin pb-6",
             (viewMode === 'duplicates' || viewMode === 'trash') && "overflow-hidden"
           )}>
-            {loading ? (
+            {loading && (viewMode === 'grid' || viewMode === 'map') ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center fade-in">
                   <div className="w-8 h-8 rounded-full border-2 border-muted-foreground/20 border-t-primary animate-spin mx-auto mb-3" />
@@ -168,20 +208,7 @@ export default function Index() {
                   setDeleteMode(on);
                   if (!on) setSelectedIds(new Set());
                 }}
-                onDeleteSelected={async () => {
-                  if (selectedIds.size === 0) return;
-                  if (!confirm(`Delete ${selectedIds.size} file(s)? They will be moved to trash.`)) return;
-                  try {
-                    await deletePhotos(Array.from(selectedIds));
-                    setPhotos(prev => prev.filter(p => !selectedIds.has(p.id)));
-                    setMapPhotos(prev => prev.filter(p => !selectedIds.has(p.id)));
-                    setTotalCount(prev => prev - selectedIds.size);
-                    toast.success(`${selectedIds.size} file(s) moved to trash`);
-                    setSelectedIds(new Set());
-                  } catch (e) {
-                    toast.error('Failed to delete files');
-                  }
-                }}
+                onDeleteSelected={handleDeleteSelected}
               />
             ) : viewMode === 'map' ? (
               <PhotoMap photos={mapPhotos} onSelect={setSelectedPhoto} />
@@ -196,32 +223,16 @@ export default function Index() {
         </main>
       </div>
 
+      {/* Mobile bottom navigation */}
+      <BottomNav viewMode={viewMode} onViewModeChange={setViewMode} />
+
       {selectedPhoto && (
         <PhotoViewer
           photo={selectedPhoto}
           photos={photos}
           onClose={() => setSelectedPhoto(null)}
           onNavigate={setSelectedPhoto}
-          onDelete={async (photo) => {
-            if (!confirm(`Delete "${photo.filename}"? It will be moved to trash.`)) return;
-            try {
-              await deletePhotos([photo.id]);
-              setPhotos(prev => prev.filter(p => p.id !== photo.id));
-              setMapPhotos(prev => prev.filter(p => p.id !== photo.id));
-              setTotalCount(prev => prev - 1);
-              toast.success('Moved to trash');
-              // Navigate to next/prev photo or close
-              const idx = photos.findIndex(p => p.id === photo.id);
-              const remaining = photos.filter(p => p.id !== photo.id);
-              if (remaining.length === 0) {
-                setSelectedPhoto(null);
-              } else {
-                setSelectedPhoto(remaining[Math.min(idx, remaining.length - 1)]);
-              }
-            } catch (e) {
-              toast.error('Failed to delete file');
-            }
-          }}
+          onDelete={handleDeleteSingle}
         />
       )}
     </div>
