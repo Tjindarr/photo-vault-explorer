@@ -6,8 +6,8 @@ import subprocess
 from typing import Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, Query, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths
@@ -229,6 +229,73 @@ os.makedirs(TRANSCODE_DIR, exist_ok=True)
 
 # Extensions that need transcoding for browser compatibility
 NEEDS_TRANSCODE = {".mov", ".avi", ".mkv", ".wmv", ".flv", ".m4v"}
+# Image formats that browsers can't display natively — convert to JPEG
+NEEDS_IMAGE_CONVERT = {".heic", ".heif", ".tiff", ".tif", ".bmp", ".avif"}
+CONVERT_DIR = os.environ.get("CONVERT_DIR", "/data/converted")
+os.makedirs(CONVERT_DIR, exist_ok=True)
+
+
+def convert_image_to_jpeg(source: str, photo_id: str) -> Optional[str]:
+    """Convert HEIC/TIFF/BMP etc to JPEG for browser compatibility. Cached."""
+    out_path = os.path.join(CONVERT_DIR, f"{photo_id}.jpg")
+    if os.path.exists(out_path):
+        return out_path
+    try:
+        from PIL import Image, ImageOps
+        from pillow_heif import register_heif_opener
+        register_heif_opener()
+        with Image.open(source) as img:
+            img = ImageOps.exif_transpose(img)
+            if img.mode not in ("RGB",):
+                img = img.convert("RGB")
+            img.save(out_path, "JPEG", quality=90, optimize=True)
+        return out_path
+    except Exception as e:
+        logger.warning(f"Image conversion failed for {source}: {e}")
+        return None
+
+
+def ranged_file_response(filepath: str, media_type: str, request: Request):
+    """Serve a file with HTTP Range support for efficient video streaming."""
+    file_size = os.path.getsize(filepath)
+    range_header = request.headers.get("range")
+
+    if not range_header:
+        return FileResponse(filepath, media_type=media_type, headers={
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=604800",
+        })
+
+    # Parse Range: bytes=start-end
+    range_spec = range_header.replace("bytes=", "").strip()
+    parts = range_spec.split("-")
+    start = int(parts[0]) if parts[0] else 0
+    end = int(parts[1]) if len(parts) > 1 and parts[1] else file_size - 1
+    end = min(end, file_size - 1)
+    length = end - start + 1
+
+    def file_chunk():
+        with open(filepath, "rb") as f:
+            f.seek(start)
+            remaining = length
+            while remaining > 0:
+                chunk = f.read(min(65536, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    return StreamingResponse(
+        file_chunk(),
+        status_code=206,
+        media_type=media_type,
+        headers={
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Content-Length": str(length),
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=604800",
+        },
+    )
 
 
 def transcode_to_mp4(source: str, photo_id: str) -> Optional[str]:
@@ -256,7 +323,7 @@ def transcode_to_mp4(source: str, photo_id: str) -> Optional[str]:
 
 
 @app.get("/api/media/{photo_id}")
-def get_media(photo_id: str):
+def get_media(photo_id: str, request: Request):
     photo = get_photo_by_id(photo_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
@@ -268,15 +335,19 @@ def get_media(photo_id: str):
 
     ext = os.path.splitext(filepath)[1].lower()
 
+    # Convert unsupported image formats to JPEG
+    if ext in NEEDS_IMAGE_CONVERT:
+        converted = convert_image_to_jpeg(filepath, photo_id)
+        if converted:
+            return FileResponse(converted, media_type="image/jpeg", headers={
+                "Cache-Control": "public, max-age=2592000",
+            })
+
     # Transcode non-MP4 videos to H.264 for browser compatibility
     if ext in NEEDS_TRANSCODE:
         transcoded = transcode_to_mp4(filepath, photo_id)
         if transcoded:
-            return FileResponse(
-                transcoded,
-                media_type="video/mp4",
-                headers={"Cache-Control": "public, max-age=604800"},
-            )
+            return ranged_file_response(transcoded, "video/mp4", request)
         # Fall through to serve original if transcode fails
 
     media_types = {
@@ -288,11 +359,13 @@ def get_media(photo_id: str):
         ".mkv": "video/x-matroska", ".webm": "video/webm", ".m4v": "video/mp4",
     }
 
-    return FileResponse(
-        filepath,
-        media_type=media_types.get(ext, "application/octet-stream"),
-        headers={"Cache-Control": "public, max-age=604800"},
-    )
+    mt = media_types.get(ext, "application/octet-stream")
+
+    # Use range response for all video files
+    if mt.startswith("video/"):
+        return ranged_file_response(filepath, mt, request)
+
+    return FileResponse(filepath, media_type=mt, headers={"Cache-Control": "public, max-age=604800"})
 
 
 @app.get("/api/stats")
