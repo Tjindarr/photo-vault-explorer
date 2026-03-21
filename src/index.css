@@ -51,7 +51,6 @@
     --overlay: 220 20% 14%;
     --gallery-gap: 4px;
     --thumb-radius: 4px;
-    --mobile-bottom-safe: env(safe-area-inset-bottom);
   }
 
   .dark {
@@ -95,7 +94,6 @@
     --surface: 225 14% 11%;
     --surface-elevated: 225 14% 14%;
     --overlay: 0 0% 0%;
-    --mobile-bottom-safe: env(safe-area-inset-bottom);
   }
 }
 
@@ -117,24 +115,18 @@
 .app-shell {
   height: 100vh;
   height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 @supports (-webkit-touch-callout: none) {
+  html, body, #root {
+    height: -webkit-fill-available;
+  }
+
   .app-shell {
     height: -webkit-fill-available;
     min-height: -webkit-fill-available;
-  }
-}
-
-@media (display-mode: standalone) {
-  :root {
-    --mobile-bottom-safe: 0px;
-  }
-}
-
-@supports (-webkit-touch-callout: none) {
-  body.standalone-pwa {
-    --mobile-bottom-safe: 0px;
   }
 }
 

@@ -18,9 +18,9 @@ const tabs: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
 export default function BottomNav({ viewMode, onViewModeChange }: BottomNavProps) {
   return (
     <nav
-      className="lg:hidden shrink-0 border-t border-border bg-surface/95 backdrop-blur-md"
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur-md"
       style={{
-        paddingBottom: 'var(--mobile-bottom-safe)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
       <div className="flex items-stretch">
