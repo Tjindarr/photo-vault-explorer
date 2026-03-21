@@ -10,7 +10,7 @@ from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths
+from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths, get_map_photos
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 
 logger = logging.getLogger("snapvault")
@@ -180,6 +180,53 @@ def list_photos(
 @app.get("/api/folders")
 def list_folders():
     return get_folder_tree()
+
+
+@app.get("/api/map-photos")
+def list_map_photos(
+    q: str = Query(None, description="Search query"),
+    folder: str = Query(None, description="Filter by folder path"),
+    limit: int = Query(20000, ge=1, le=100000),
+):
+    photos = get_map_photos(query=q, folder=folder, limit=limit)
+
+    stale_paths = [
+        p["path"] for p in photos
+        if not os.path.exists(os.path.join(PHOTOS_DIR, p["path"]))
+    ]
+    if stale_paths:
+        purge_stale_photos(stale_paths)
+        stale_path_set = set(stale_paths)
+        photos = [p for p in photos if p["path"] not in stale_path_set]
+
+    items = []
+    for p in photos:
+        items.append({
+            "id": p["id"],
+            "filename": p["filename"],
+            "path": p["path"],
+            "folder": p["folder"],
+            "type": p["type"],
+            "width": p["width"],
+            "height": p["height"],
+            "thumbnailUrl": f"/api/thumbnails/{p['id']}" if p.get("thumbnail_path") else None,
+            "fullUrl": f"/api/media/{p['id']}",
+            "fileSize": p["file_size"],
+            "metadata": {
+                "dateTaken": p["date_taken"],
+                "location": p["location"],
+                "camera": p["camera"],
+                "lens": p["lens"],
+                "iso": p["iso"],
+                "aperture": p["aperture"],
+                "shutterSpeed": p["shutter_speed"],
+                "gpsLat": p["gps_lat"],
+                "gpsLng": p["gps_lng"],
+            },
+            "createdAt": p["date_taken"] or p["file_modified_at"],
+        })
+
+    return {"items": items, "total": len(items)}
 
 
 @app.get("/api/photos/{photo_id}")
