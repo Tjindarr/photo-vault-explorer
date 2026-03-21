@@ -235,6 +235,11 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
           );
         })}
       </div>
+      {loadingMore && (
+        <div className="flex justify-center py-4">
+          <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/20 border-t-primary animate-spin" />
+        </div>
+      )}
     </div>
   );
 }
