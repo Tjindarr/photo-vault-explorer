@@ -84,31 +84,6 @@ export default function Index() {
       );
     }
 
-    if (dateRange) {
-      photos = photos.filter((p) => {
-        if (!p.metadata.dateTaken) return false;
-        const d = new Date(p.metadata.dateTaken);
-        return d >= dateRange[0] && d <= dateRange[1];
-      });
-    }
-
-    return photos;
-  }, [allPhotos, selectedFolder, searchQuery, dateRange]);
-
-  const photosBeforeDateFilter = useMemo(() => {
-    let photos = allPhotos;
-    if (selectedFolder) photos = photos.filter((p) => p.folder.startsWith(selectedFolder));
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      photos = photos.filter((p) =>
-        p.filename.toLowerCase().includes(q) ||
-        p.metadata.location?.toLowerCase().includes(q) ||
-        p.metadata.camera?.toLowerCase().includes(q) ||
-        p.metadata.dateTaken?.includes(q) ||
-        p.folder.toLowerCase().includes(q) ||
-        p.type.toLowerCase().includes(q)
-      );
-    }
     return photos;
   }, [allPhotos, selectedFolder, searchQuery]);
 
