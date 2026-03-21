@@ -51,6 +51,7 @@
     --overlay: 220 20% 14%;
     --gallery-gap: 4px;
     --thumb-radius: 4px;
+    --mobile-bottom-safe: env(safe-area-inset-bottom);
   }
 
   .dark {
@@ -94,6 +95,7 @@
     --surface: 225 14% 11%;
     --surface-elevated: 225 14% 14%;
     --overlay: 0 0% 0%;
+    --mobile-bottom-safe: env(safe-area-inset-bottom);
   }
 }
 
@@ -108,6 +110,18 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@media (display-mode: standalone) {
+  :root {
+    --mobile-bottom-safe: 0px;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  body.standalone-pwa {
+    --mobile-bottom-safe: 0px;
   }
 }
 
