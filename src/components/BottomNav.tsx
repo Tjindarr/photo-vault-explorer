@@ -19,7 +19,7 @@ export default function BottomNav({ viewMode, onViewModeChange }: BottomNavProps
   return (
     <nav
       className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur-md"
-      style={{ paddingBottom: 'max(0.25rem, calc(env(safe-area-inset-bottom) - 20px))' }}
+      style={{ paddingBottom: '0px' }}
     >
       <div className="flex items-stretch pt-1">
         {tabs.map(({ mode, icon: Icon, label }) => {
