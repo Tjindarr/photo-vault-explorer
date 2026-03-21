@@ -20,7 +20,7 @@ export default function BottomNav({ viewMode, onViewModeChange }: BottomNavProps
     <nav
       className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur-md"
       style={{
-        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingBottom: 'var(--mobile-bottom-safe)',
       }}
     >
       <div className="flex items-stretch">

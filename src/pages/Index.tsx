@@ -163,7 +163,7 @@ export default function Index() {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden pb-[calc(3.5rem+var(--mobile-bottom-safe))] lg:pb-0">
           {(viewMode === 'grid' || viewMode === 'map') && (
             <div className="px-3 sm:px-5 pt-3 sm:pt-4 pb-2 space-y-2">
               <SearchBar
