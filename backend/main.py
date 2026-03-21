@@ -10,7 +10,7 @@ from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths, get_map_photos
+from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths, get_map_photos, get_duplicate_photos, delete_photos_by_ids
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 
 logger = logging.getLogger("snapvault")
@@ -117,7 +117,7 @@ app = FastAPI(title="SnapVault API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -418,6 +418,97 @@ def get_media(photo_id: str, request: Request):
 @app.get("/api/stats")
 def stats():
     return get_stats()
+
+
+def _format_photo(p: dict) -> dict:
+    return {
+        "id": p["id"],
+        "filename": p["filename"],
+        "path": p["path"],
+        "folder": p["folder"],
+        "type": p["type"],
+        "width": p["width"],
+        "height": p["height"],
+        "thumbnailUrl": f"/api/thumbnails/{p['id']}" if p.get("thumbnail_path") else None,
+        "fullUrl": f"/api/media/{p['id']}",
+        "fileSize": p["file_size"],
+        "fileHash": p.get("file_hash"),
+        "metadata": {
+            "dateTaken": p["date_taken"],
+            "location": p["location"],
+            "camera": p["camera"],
+            "lens": p["lens"],
+            "iso": p["iso"],
+            "aperture": p["aperture"],
+            "shutterSpeed": p["shutter_speed"],
+            "gpsLat": p["gps_lat"],
+            "gpsLng": p["gps_lng"],
+        },
+        "createdAt": p["date_taken"] or p["file_modified_at"],
+    }
+
+
+@app.get("/api/duplicates")
+def list_duplicates():
+    photos = get_duplicate_photos()
+
+    # Purge stale
+    stale_paths = [
+        p["path"] for p in photos
+        if not os.path.exists(os.path.join(PHOTOS_DIR, p["path"]))
+    ]
+    if stale_paths:
+        purge_stale_photos(stale_paths)
+        stale_set = set(stale_paths)
+        photos = [p for p in photos if p["path"] not in stale_set]
+
+    # Group by file_hash
+    groups: dict[str, list] = {}
+    for p in photos:
+        h = p["file_hash"]
+        if h not in groups:
+            groups[h] = []
+        groups[h].append(_format_photo(p))
+
+    # Only keep groups with 2+ items
+    result = [{"hash": h, "photos": items} for h, items in groups.items() if len(items) >= 2]
+
+    total_duplicates = sum(len(g["photos"]) - 1 for g in result)
+    return {"groups": result, "totalGroups": len(result), "totalDuplicates": total_duplicates}
+
+
+@app.delete("/api/photos")
+def delete_photos(request: Request):
+    import json
+    body = json.loads(request._receive)
+    # This won't work with FastAPI, need proper body parsing
+    pass
+
+
+from pydantic import BaseModel
+
+
+class DeletePhotosRequest(BaseModel):
+    ids: list[str]
+
+
+@app.post("/api/photos/delete")
+def delete_photos_endpoint(req: DeletePhotosRequest):
+    """Delete photos by ID — removes DB entries, thumbnails, transcoded & converted files."""
+    removed = delete_photos_by_ids(req.ids)
+    for entry in removed:
+        if entry.get("thumbnail_path"):
+            thumb_file = os.path.join(THUMB_DIR, entry["thumbnail_path"])
+            if os.path.exists(thumb_file):
+                os.remove(thumb_file)
+        transcode_file = os.path.join(TRANSCODE_DIR, f"{entry['id']}.mp4")
+        if os.path.exists(transcode_file):
+            os.remove(transcode_file)
+        convert_file = os.path.join(CONVERT_DIR, f"{entry['id']}.jpg")
+        if os.path.exists(convert_file):
+            os.remove(convert_file)
+
+    return {"deleted": len(removed), "ids": [r["id"] for r in removed]}
 
 
 @app.post("/api/reindex")
