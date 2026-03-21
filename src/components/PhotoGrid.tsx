@@ -7,6 +7,9 @@ import type { Photo } from '@/lib/mock-data';
 interface PhotoGridProps {
   photos: Photo[];
   onSelect: (photo: Photo) => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 // A row is either a date header or a row of photo thumbnails
@@ -106,7 +109,7 @@ function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo
   );
 }
 
-export default function PhotoGrid({ photos, onSelect }: PhotoGridProps) {
+export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLoadMore }: PhotoGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(4);
 
@@ -148,6 +151,22 @@ export default function PhotoGrid({ photos, onSelect }: PhotoGridProps) {
     },
     overscan: 8,
   });
+
+  // Infinite scroll: load more when near bottom
+  useEffect(() => {
+    if (!hasMore || !onLoadMore) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (loadingMore) return;
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      if (scrollHeight - scrollTop - clientHeight < 800) {
+        onLoadMore();
+      }
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [hasMore, loadingMore, onLoadMore]);
 
   if (photos.length === 0) {
     return (
@@ -216,6 +235,11 @@ export default function PhotoGrid({ photos, onSelect }: PhotoGridProps) {
           );
         })}
       </div>
+      {loadingMore && (
+        <div className="flex justify-center py-4">
+          <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/20 border-t-primary animate-spin" />
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import AppHeader, { type ViewMode } from '@/components/AppHeader';
 import FolderSidebar from '@/components/FolderSidebar';
@@ -8,84 +8,100 @@ import PhotoMap from '@/components/PhotoMap';
 import StatsDashboard from '@/components/StatsDashboard';
 import PhotoViewer from '@/components/PhotoViewer';
 import { type Photo, type Folder } from '@/lib/mock-data';
-import { fetchPhotos, fetchFolders, isApiAvailable } from '@/lib/api-client';
+import { fetchPhotos, fetchFolders, fetchStats, isApiAvailable } from '@/lib/api-client';
+
+const PAGE_SIZE = 500;
 
 export default function Index() {
-  const PHOTO_PAGE_SIZE = 10000;
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
-  const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [usingApi, setUsingApi] = useState(false);
 
-  const loadAllPhotos = useCallback(async () => {
-    const firstPage = await fetchPhotos({ limit: PHOTO_PAGE_SIZE, offset: 0 });
+  // Debounce search query
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-    if (firstPage.total <= firstPage.items.length) {
-      return firstPage.items;
-    }
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchQuery]);
 
-    const remainingRequests: Promise<{ items: Photo[]; total: number }>[] = [];
-    for (let offset = firstPage.items.length; offset < firstPage.total; offset += PHOTO_PAGE_SIZE) {
-      remainingRequests.push(fetchPhotos({ limit: PHOTO_PAGE_SIZE, offset }));
-    }
+  // Build API params from current filters
+  const apiParams = useMemo(() => ({
+    folder: selectedFolder || undefined,
+    query: debouncedQuery || undefined,
+  }), [selectedFolder, debouncedQuery]);
 
-    const remainingPages = await Promise.all(remainingRequests);
-    return [
-      ...firstPage.items,
-      ...remainingPages.flatMap((page) => page.items),
-    ];
-  }, [PHOTO_PAGE_SIZE]);
-
-  // Load photos and folders
-  const loadData = useCallback(async () => {
+  // Load first page when filters change
+  const loadPhotos = useCallback(async () => {
     setLoading(true);
     try {
-      const apiReady = await isApiAvailable();
-      setUsingApi(apiReady);
-
-      const [photosResult, foldersResult] = await Promise.all([
-        loadAllPhotos(),
-        fetchFolders(),
-      ]);
-       setAllPhotos(photosResult);
-      setFolders(foldersResult);
+      const result = await fetchPhotos({ ...apiParams, limit: PAGE_SIZE, offset: 0 });
+      setPhotos(result.items);
+      setTotalCount(result.total);
     } catch (e) {
-      console.error('Failed to load data:', e);
+      console.error('Failed to load photos:', e);
     } finally {
       setLoading(false);
     }
-  }, [loadAllPhotos]);
+  }, [apiParams]);
 
-  useEffect(() => { loadData(); }, [loadData]);
-
-  // Client-side filtering (works for both mock and API data)
-  const filteredPhotos = useMemo(() => {
-    let photos = allPhotos;
-
-    if (selectedFolder) {
-      photos = photos.filter((p) => p.folder.startsWith(selectedFolder));
+  // Load next page (infinite scroll)
+  const loadMore = useCallback(async () => {
+    if (loadingMore || photos.length >= totalCount) return;
+    setLoadingMore(true);
+    try {
+      const result = await fetchPhotos({ ...apiParams, limit: PAGE_SIZE, offset: photos.length });
+      setPhotos(prev => [...prev, ...result.items]);
+    } catch (e) {
+      console.error('Failed to load more photos:', e);
+    } finally {
+      setLoadingMore(false);
     }
+  }, [apiParams, photos.length, totalCount, loadingMore]);
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      photos = photos.filter((p) =>
-        p.filename.toLowerCase().includes(q) ||
-        p.metadata.location?.toLowerCase().includes(q) ||
-        p.metadata.camera?.toLowerCase().includes(q) ||
-        p.metadata.dateTaken?.includes(q) ||
-        p.folder.toLowerCase().includes(q) ||
-        p.type.toLowerCase().includes(q)
-      );
+  // Initial load + reload on filter changes
+  useEffect(() => {
+    const init = async () => {
+      const apiReady = await isApiAvailable();
+      setUsingApi(apiReady);
+      const [, foldersResult] = await Promise.all([
+        loadPhotos(),
+        fetchFolders(),
+      ]);
+      setFolders(foldersResult);
+    };
+    init();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reload photos when filters change (not on first mount)
+  const isFirstMount = useRef(true);
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
     }
+    loadPhotos();
+  }, [loadPhotos]);
 
-    return photos;
-  }, [allPhotos, selectedFolder, searchQuery]);
+  // Load stats from server when switching to stats view
+  useEffect(() => {
+    if (viewMode === 'stats' && !stats) {
+      fetchStats().then(setStats).catch(console.error);
+    }
+  }, [viewMode, stats]);
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -107,7 +123,7 @@ export default function Index() {
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
-              resultCount={filteredPhotos.length}
+              resultCount={totalCount}
             />
           </div>
           <div className={cn(
@@ -122,11 +138,17 @@ export default function Index() {
                 </div>
               </div>
             ) : viewMode === 'grid' ? (
-              <PhotoGrid photos={filteredPhotos} onSelect={setSelectedPhoto} />
+              <PhotoGrid
+                photos={photos}
+                onSelect={setSelectedPhoto}
+                hasMore={photos.length < totalCount}
+                loadingMore={loadingMore}
+                onLoadMore={loadMore}
+              />
             ) : viewMode === 'map' ? (
-              <PhotoMap photos={filteredPhotos} onSelect={setSelectedPhoto} />
+              <PhotoMap photos={photos} onSelect={setSelectedPhoto} />
             ) : (
-              <StatsDashboard photos={filteredPhotos} />
+              <StatsDashboard stats={stats} />
             )}
           </div>
         </main>
@@ -135,7 +157,7 @@ export default function Index() {
       {selectedPhoto && (
         <PhotoViewer
           photo={selectedPhoto}
-          photos={filteredPhotos}
+          photos={photos}
           onClose={() => setSelectedPhoto(null)}
           onNavigate={setSelectedPhoto}
         />
