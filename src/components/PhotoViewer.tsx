@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
-import { X, MapPin, Camera, Clock, Maximize2 } from 'lucide-react';
+import { X, MapPin, Camera, Clock, Maximize2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Photo } from '@/lib/mock-data';
 
@@ -8,6 +8,7 @@ interface PhotoViewerProps {
   photos: Photo[];
   onClose: () => void;
   onNavigate: (photo: Photo) => void;
+  onDelete?: (photo: Photo) => void;
 }
 
 function formatFileSize(bytes: number) {
@@ -29,7 +30,7 @@ function formatDateTime(dateStr: string) {
 
 const SWIPE_THRESHOLD = 50;
 
-export default function PhotoViewer({ photo, photos, onClose, onNavigate }: PhotoViewerProps) {
+export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDelete }: PhotoViewerProps) {
   const [loaded, setLoaded] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const thumbStripRef = useRef<HTMLDivElement>(null);
@@ -114,6 +115,15 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate }: Phot
           <span className="text-white/50 text-xs tabular-nums mr-2">
             {currentIndex + 1} / {photos.length}
           </span>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(photo)}
+              className="p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-white/10 transition-colors active:scale-95"
+              aria-label="Delete photo"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={() => setShowInfo(!showInfo)}
             className={cn(

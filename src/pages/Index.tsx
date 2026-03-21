@@ -9,7 +9,8 @@ import StatsDashboard from '@/components/StatsDashboard';
 import DuplicatesView from '@/components/DuplicatesView';
 import PhotoViewer from '@/components/PhotoViewer';
 import { type Photo, type Folder } from '@/lib/mock-data';
-import { fetchPhotos, fetchFolders, fetchMapPhotos, fetchStats, isApiAvailable } from '@/lib/api-client';
+import { fetchPhotos, fetchFolders, fetchMapPhotos, fetchStats, deletePhotos, isApiAvailable } from '@/lib/api-client';
+import { toast } from 'sonner';
 
 const PAGE_SIZE = 500;
 
@@ -28,6 +29,8 @@ export default function Index() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [usingApi, setUsingApi] = useState(false);
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Debounce search query
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -146,10 +149,38 @@ export default function Index() {
             ) : viewMode === 'grid' ? (
               <PhotoGrid
                 photos={photos}
-                onSelect={setSelectedPhoto}
+                onSelect={deleteMode ? undefined : setSelectedPhoto}
                 hasMore={photos.length < totalCount}
                 loadingMore={loadingMore}
                 onLoadMore={loadMore}
+                deleteMode={deleteMode}
+                selectedIds={selectedIds}
+                onToggleSelect={(id) => {
+                  setSelectedIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                  });
+                }}
+                onDeleteModeChange={(on) => {
+                  setDeleteMode(on);
+                  if (!on) setSelectedIds(new Set());
+                }}
+                onDeleteSelected={async () => {
+                  if (selectedIds.size === 0) return;
+                  if (!confirm(`Permanently delete ${selectedIds.size} file(s) from disk? This cannot be undone.`)) return;
+                  try {
+                    await deletePhotos(Array.from(selectedIds));
+                    setPhotos(prev => prev.filter(p => !selectedIds.has(p.id)));
+                    setMapPhotos(prev => prev.filter(p => !selectedIds.has(p.id)));
+                    setTotalCount(prev => prev - selectedIds.size);
+                    toast.success(`${selectedIds.size} file(s) deleted`);
+                    setSelectedIds(new Set());
+                  } catch (e) {
+                    toast.error('Failed to delete files');
+                  }
+                }}
               />
             ) : viewMode === 'map' ? (
               <PhotoMap photos={mapPhotos} onSelect={setSelectedPhoto} />
@@ -168,6 +199,26 @@ export default function Index() {
           photos={photos}
           onClose={() => setSelectedPhoto(null)}
           onNavigate={setSelectedPhoto}
+          onDelete={async (photo) => {
+            if (!confirm(`Permanently delete "${photo.filename}" from disk? This cannot be undone.`)) return;
+            try {
+              await deletePhotos([photo.id]);
+              setPhotos(prev => prev.filter(p => p.id !== photo.id));
+              setMapPhotos(prev => prev.filter(p => p.id !== photo.id));
+              setTotalCount(prev => prev - 1);
+              toast.success('File deleted');
+              // Navigate to next/prev photo or close
+              const idx = photos.findIndex(p => p.id === photo.id);
+              const remaining = photos.filter(p => p.id !== photo.id);
+              if (remaining.length === 0) {
+                setSelectedPhoto(null);
+              } else {
+                setSelectedPhoto(remaining[Math.min(idx, remaining.length - 1)]);
+              }
+            } catch (e) {
+              toast.error('Failed to delete file');
+            }
+          }}
         />
       )}
     </div>
