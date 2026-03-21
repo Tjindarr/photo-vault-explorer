@@ -50,10 +50,20 @@ def run_indexer():
             if count % 100 == 0:
                 logger.info(f"Indexed {count} new/changed files ({skipped} skipped)...")
 
-        # Clean up removed files
+        # Clean up removed files (DB entries + thumbnail/transcode files)
         removed = remove_missing_photos(existing_paths)
         if removed:
-            logger.info(f"Removed {removed} entries for deleted files")
+            for entry in removed:
+                # Remove thumbnail
+                if entry.get("thumbnail_path"):
+                    thumb_file = os.path.join(THUMB_DIR, entry["thumbnail_path"])
+                    if os.path.exists(thumb_file):
+                        os.remove(thumb_file)
+                # Remove transcoded video
+                transcode_file = os.path.join(TRANSCODE_DIR, f"{entry['id']}.mp4")
+                if os.path.exists(transcode_file):
+                    os.remove(transcode_file)
+            logger.info(f"Removed {len(removed)} entries + files for deleted photos")
 
         indexing_status["last_run"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         logger.info(f"Indexing complete: {count} new/changed, {skipped} skipped")
