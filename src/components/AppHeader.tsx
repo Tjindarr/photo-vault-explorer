@@ -85,7 +85,7 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
   };
 
   return (
-    <header className="shrink-0 border-b border-border bg-surface" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className="shrink-0 border-b border-border bg-surface">
       <div className="h-12 flex items-center px-3 sm:px-4 gap-2 sm:gap-3">
         <button
           onClick={onToggleSidebar}
