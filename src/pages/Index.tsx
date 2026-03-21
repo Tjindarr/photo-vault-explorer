@@ -149,7 +149,7 @@ export default function Index() {
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-background overflow-hidden">
+    <div className="app-shell flex flex-col bg-background overflow-hidden">
       <AppHeader
         onToggleSidebar={() => setSidebarOpen(true)}
         viewMode={viewMode}
