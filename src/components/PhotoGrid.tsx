@@ -1,15 +1,22 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Play, MapPin, Calendar } from 'lucide-react';
+import { Play, MapPin, Calendar, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import type { Photo } from '@/lib/mock-data';
 
 interface PhotoGridProps {
   photos: Photo[];
-  onSelect: (photo: Photo) => void;
+  onSelect?: (photo: Photo) => void;
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  deleteMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onDeleteModeChange?: (on: boolean) => void;
+  onDeleteSelected?: () => void;
 }
 
 // A row is either a date header or a row of photo thumbnails
@@ -43,16 +50,33 @@ function buildRows(photos: Photo[], cols: number): GridRow[] {
   return rows;
 }
 
-function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo) => void }) {
+function PhotoThumbnail({ photo, onSelect, deleteMode, selected, onToggleSelect }: {
+  photo: Photo;
+  onSelect?: (p: Photo) => void;
+  deleteMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
+}) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
   const imgSrc = failed ? null : (photo.thumbnailUrl || photo.fullUrl);
 
+  const handleClick = () => {
+    if (deleteMode && onToggleSelect) {
+      onToggleSelect(photo.id);
+    } else if (onSelect) {
+      onSelect(photo);
+    }
+  };
+
   return (
     <button
-      onClick={() => onSelect(photo)}
-      className="group relative overflow-hidden bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 outline-none active:scale-[0.97] transition-transform duration-150"
+      onClick={handleClick}
+      className={cn(
+        "group relative overflow-hidden bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 outline-none active:scale-[0.97] transition-all duration-150",
+        deleteMode && selected && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
+      )}
       style={{ borderRadius: 'var(--thumb-radius)', aspectRatio: '1' }}
     >
       {imgSrc && !failed ? (
@@ -65,7 +89,8 @@ function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo
           className={cn(
             'absolute inset-0 w-full h-full object-cover transition-all duration-500',
             loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105',
-            'group-hover:scale-[1.03] group-hover:brightness-110',
+            !deleteMode && 'group-hover:scale-[1.03] group-hover:brightness-110',
+            deleteMode && selected && 'brightness-75',
           )}
         />
       ) : null}
@@ -86,24 +111,36 @@ function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo
         </div>
       )}
 
-      <div className={cn(
-        'absolute inset-0 bg-gradient-to-t from-overlay/60 via-transparent to-transparent',
-        'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
-        'flex flex-col justify-end p-2.5',
-      )}>
-        <p className="text-white text-xs font-medium truncate">{photo.filename}</p>
-        {photo.metadata.location && (
-          <p className="text-white/70 text-[10px] flex items-center gap-1 mt-0.5">
-            <MapPin className="h-2.5 w-2.5" />
-            {photo.metadata.location}
-          </p>
-        )}
-      </div>
+      {deleteMode && (
+        <div className="absolute top-1.5 right-1.5 z-10">
+          {selected ? (
+            <CheckCircle2 className="h-5 w-5 text-destructive drop-shadow-md" />
+          ) : (
+            <Circle className="h-5 w-5 text-white/70 drop-shadow-md" />
+          )}
+        </div>
+      )}
+
+      {!deleteMode && (
+        <div className={cn(
+          'absolute inset-0 bg-gradient-to-t from-overlay/60 via-transparent to-transparent',
+          'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
+          'flex flex-col justify-end p-2.5',
+        )}>
+          <p className="text-white text-xs font-medium truncate">{photo.filename}</p>
+          {photo.metadata.location && (
+            <p className="text-white/70 text-[10px] flex items-center gap-1 mt-0.5">
+              <MapPin className="h-2.5 w-2.5" />
+              {photo.metadata.location}
+            </p>
+          )}
+        </div>
+      )}
     </button>
   );
 }
 
-export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLoadMore }: PhotoGridProps) {
+export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLoadMore, deleteMode, selectedIds, onToggleSelect, onDeleteModeChange, onDeleteSelected }: PhotoGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(4);
 
@@ -175,7 +212,30 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
   }
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto scrollbar-thin">
+    <div className="h-full flex flex-col">
+      {/* Delete mode toolbar */}
+      <div className="shrink-0 flex items-center gap-3 px-1 py-2">
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={deleteMode || false}
+            onCheckedChange={(checked) => onDeleteModeChange?.(checked)}
+            className="data-[state=checked]:bg-destructive"
+          />
+          <span className="text-xs text-muted-foreground font-medium">Delete mode</span>
+        </div>
+        {deleteMode && selectedIds && selectedIds.size > 0 && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onDeleteSelected}
+            className="gap-1.5"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete {selectedIds.size} selected
+          </Button>
+        )}
+      </div>
+      <div ref={containerRef} className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
       <div
         style={{
           height: `${virtualizer.getTotalSize()}px`,
@@ -223,7 +283,14 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
               }}
             >
               {row.photos.map((photo) => (
-                <PhotoThumbnail key={photo.id} photo={photo} onSelect={onSelect} />
+                <PhotoThumbnail
+                  key={photo.id}
+                  photo={photo}
+                  onSelect={onSelect}
+                  deleteMode={deleteMode}
+                  selected={selectedIds?.has(photo.id)}
+                  onToggleSelect={onToggleSelect}
+                />
               ))}
             </div>
           );
@@ -234,6 +301,7 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
           <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/20 border-t-primary animate-spin" />
         </div>
       )}
+      </div>
     </div>
   );
 }
