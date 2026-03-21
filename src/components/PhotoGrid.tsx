@@ -149,8 +149,18 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
       if (row.type === 'header') return HEADER_HEIGHT;
       return getThumbSize() + GAP;
     },
-    overscan: 8,
+    onChange: [rows.length],
   });
+
+  // Infinite scroll: load more when near bottom
+  useEffect(() => {
+    if (!hasMore || loadingMore || !onLoadMore) return;
+    const items = virtualizer.getVirtualItems();
+    const lastItem = items[items.length - 1];
+    if (lastItem && lastItem.index >= rows.length - 5) {
+      onLoadMore();
+    }
+  }, [virtualizer.getVirtualItems(), hasMore, loadingMore, onLoadMore, rows.length]);
 
   if (photos.length === 0) {
     return (
