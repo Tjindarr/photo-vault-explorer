@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 import logging
 import threading
@@ -11,7 +12,12 @@ from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths, get_map_photos, get_duplicate_photos, delete_photos_by_ids
+from database import (
+    init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id,
+    get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths,
+    get_map_photos, get_duplicate_photos, delete_photos_by_ids,
+    add_to_trash, get_trash_items, get_trash_item_by_id, remove_from_trash, purge_expired_trash,
+)
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 
 logger = logging.getLogger("snapvault")
@@ -19,6 +25,20 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 # Track indexing state
 indexing_status = {"running": False, "progress": 0, "total": 0, "last_run": None}
+
+TRANSCODE_DIR = os.environ.get("TRANSCODE_DIR", "/data/transcoded")
+os.makedirs(TRANSCODE_DIR, exist_ok=True)
+
+CONVERT_DIR = os.environ.get("CONVERT_DIR", "/data/converted")
+os.makedirs(CONVERT_DIR, exist_ok=True)
+
+TRASH_DIR = os.environ.get("TRASH_DIR", "/data/trash")
+os.makedirs(TRASH_DIR, exist_ok=True)
+
+# Extensions that need transcoding for browser compatibility
+NEEDS_TRANSCODE = {".mov", ".avi", ".mkv", ".wmv", ".flv", ".m4v"}
+# Image formats that browsers can't display natively — convert to JPEG
+NEEDS_IMAGE_CONVERT = {".heic", ".heif", ".tiff", ".tif", ".bmp", ".avif"}
 
 
 def get_current_media_paths() -> set[str]:
@@ -40,6 +60,16 @@ def run_indexer():
     logger.info(f"Starting index scan of {PHOTOS_DIR}...")
 
     try:
+        # Auto-purge expired trash items (>30 days)
+        expired = purge_expired_trash(30)
+        for entry in expired:
+            trash_file = os.path.join(TRASH_DIR, entry["trash_path"])
+            if os.path.exists(trash_file):
+                os.remove(trash_file)
+            _cleanup_cached_files(entry["id"], entry.get("thumbnail_path"))
+        if expired:
+            logger.info(f"Purged {len(expired)} expired trash items")
+
         # Load existing indexed hashes to skip unchanged files
         known_hashes = get_indexed_hashes()
         logger.info(f"Found {len(known_hashes)} already-indexed files in DB")
@@ -67,15 +97,7 @@ def run_indexer():
         removed = remove_missing_photos(current_paths)
         if removed:
             for entry in removed:
-                # Remove thumbnail
-                if entry.get("thumbnail_path"):
-                    thumb_file = os.path.join(THUMB_DIR, entry["thumbnail_path"])
-                    if os.path.exists(thumb_file):
-                        os.remove(thumb_file)
-                # Remove transcoded video
-                transcode_file = os.path.join(TRANSCODE_DIR, f"{entry['id']}.mp4")
-                if os.path.exists(transcode_file):
-                    os.remove(transcode_file)
+                _cleanup_cached_files(entry["id"], entry.get("thumbnail_path"))
             logger.info(f"Removed {len(removed)} entries + files for deleted photos")
 
         indexing_status["last_run"] = time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -87,19 +109,25 @@ def run_indexer():
         indexing_status["running"] = False
 
 
+def _cleanup_cached_files(photo_id: str, thumbnail_path: Optional[str] = None):
+    """Remove thumbnail, transcode, and convert cache for a photo."""
+    if thumbnail_path:
+        thumb_file = os.path.join(THUMB_DIR, thumbnail_path)
+        if os.path.exists(thumb_file):
+            os.remove(thumb_file)
+    transcode_file = os.path.join(TRANSCODE_DIR, f"{photo_id}.mp4")
+    if os.path.exists(transcode_file):
+        os.remove(transcode_file)
+    convert_file = os.path.join(CONVERT_DIR, f"{photo_id}.jpg")
+    if os.path.exists(convert_file):
+        os.remove(convert_file)
+
+
 def purge_stale_photos(paths: list[str]) -> list[dict]:
     """Delete stale DB rows and cached files for media paths that no longer exist."""
     removed = remove_photos_by_paths(paths)
     for entry in removed:
-        if entry.get("thumbnail_path"):
-            thumb_file = os.path.join(THUMB_DIR, entry["thumbnail_path"])
-            if os.path.exists(thumb_file):
-                os.remove(thumb_file)
-
-        transcode_file = os.path.join(TRANSCODE_DIR, f"{entry['id']}.mp4")
-        if os.path.exists(transcode_file):
-            os.remove(transcode_file)
-
+        _cleanup_cached_files(entry["id"], entry.get("thumbnail_path"))
     return removed
 
 
@@ -150,30 +178,7 @@ def list_photos(
     # Format for frontend
     items = []
     for p in photos:
-        items.append({
-            "id": p["id"],
-            "filename": p["filename"],
-            "path": p["path"],
-            "folder": p["folder"],
-            "type": p["type"],
-            "width": p["width"],
-            "height": p["height"],
-            "thumbnailUrl": f"/api/thumbnails/{p['id']}" if p.get("thumbnail_path") else None,
-            "fullUrl": f"/api/media/{p['id']}",
-            "fileSize": p["file_size"],
-            "metadata": {
-                "dateTaken": p["date_taken"],
-                "location": p["location"],
-                "camera": p["camera"],
-                "lens": p["lens"],
-                "iso": p["iso"],
-                "aperture": p["aperture"],
-                "shutterSpeed": p["shutter_speed"],
-                "gpsLat": p["gps_lat"],
-                "gpsLng": p["gps_lng"],
-            },
-            "createdAt": p["date_taken"] or p["file_modified_at"],
-        })
+        items.append(_format_photo(p))
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -200,33 +205,7 @@ def list_map_photos(
         stale_path_set = set(stale_paths)
         photos = [p for p in photos if p["path"] not in stale_path_set]
 
-    items = []
-    for p in photos:
-        items.append({
-            "id": p["id"],
-            "filename": p["filename"],
-            "path": p["path"],
-            "folder": p["folder"],
-            "type": p["type"],
-            "width": p["width"],
-            "height": p["height"],
-            "thumbnailUrl": f"/api/thumbnails/{p['id']}" if p.get("thumbnail_path") else None,
-            "fullUrl": f"/api/media/{p['id']}",
-            "fileSize": p["file_size"],
-            "metadata": {
-                "dateTaken": p["date_taken"],
-                "location": p["location"],
-                "camera": p["camera"],
-                "lens": p["lens"],
-                "iso": p["iso"],
-                "aperture": p["aperture"],
-                "shutterSpeed": p["shutter_speed"],
-                "gpsLat": p["gps_lat"],
-                "gpsLng": p["gps_lng"],
-            },
-            "createdAt": p["date_taken"] or p["file_modified_at"],
-        })
-
+    items = [_format_photo(p) for p in photos]
     return {"items": items, "total": len(items)}
 
 
@@ -270,17 +249,6 @@ def get_thumbnail(photo_id: str):
         thumb_path = os.path.join(THUMB_DIR, regenerated_rel)
 
     return FileResponse(thumb_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=2592000"})
-
-
-TRANSCODE_DIR = os.environ.get("TRANSCODE_DIR", "/data/transcoded")
-os.makedirs(TRANSCODE_DIR, exist_ok=True)
-
-# Extensions that need transcoding for browser compatibility
-NEEDS_TRANSCODE = {".mov", ".avi", ".mkv", ".wmv", ".flv", ".m4v"}
-# Image formats that browsers can't display natively — convert to JPEG
-NEEDS_IMAGE_CONVERT = {".heic", ".heif", ".tiff", ".tif", ".bmp", ".avif"}
-CONVERT_DIR = os.environ.get("CONVERT_DIR", "/data/converted")
-os.makedirs(CONVERT_DIR, exist_ok=True)
 
 
 def convert_image_to_jpeg(source: str, photo_id: str) -> Optional[str]:
@@ -449,6 +417,26 @@ def _format_photo(p: dict) -> dict:
     }
 
 
+def _format_trash_item(p: dict) -> dict:
+    return {
+        "id": p["id"],
+        "filename": p["filename"],
+        "originalPath": p["original_path"],
+        "folder": p["folder"],
+        "type": p["type"],
+        "width": p["width"],
+        "height": p["height"],
+        "thumbnailUrl": f"/api/trash/thumbnails/{p['id']}" if p.get("thumbnail_path") else None,
+        "fileSize": p["file_size"],
+        "deletedAt": p["deleted_at"],
+        "metadata": {
+            "dateTaken": p["date_taken"],
+            "location": p["location"],
+            "camera": p["camera"],
+        },
+    }
+
+
 @app.get("/api/duplicates")
 def list_duplicates():
     photos = get_duplicate_photos()
@@ -484,33 +472,158 @@ class DeletePhotosRequest(BaseModel):
 
 @app.post("/api/photos/delete")
 def delete_photos_endpoint(req: DeletePhotosRequest):
-    """Delete photos by ID — removes source files, DB entries, and all cached files."""
+    """Delete photos by ID — moves files to trash for 30-day recovery."""
     removed = delete_photos_by_ids(req.ids)
-    deleted_from_disk = 0
+    moved_to_trash = 0
+
     for entry in removed:
-        # Delete original file from disk
         source_file = os.path.join(PHOTOS_DIR, entry["path"])
+        trash_filename = f"{entry['id']}_{entry['filename']}"
+        trash_path = os.path.join(TRASH_DIR, trash_filename)
+
+        file_moved = False
         if os.path.exists(source_file):
             try:
-                os.remove(source_file)
-                deleted_from_disk += 1
-                logger.info(f"Deleted source file: {entry['path']}")
+                shutil.move(source_file, trash_path)
+                file_moved = True
+                moved_to_trash += 1
+                logger.info(f"Moved to trash: {entry['path']}")
             except OSError as e:
-                logger.warning(f"Failed to delete source file {entry['path']}: {e}")
+                logger.warning(f"Failed to move to trash {entry['path']}: {e}")
 
-        # Delete cached files
-        if entry.get("thumbnail_path"):
-            thumb_file = os.path.join(THUMB_DIR, entry["thumbnail_path"])
-            if os.path.exists(thumb_file):
-                os.remove(thumb_file)
-        transcode_file = os.path.join(TRANSCODE_DIR, f"{entry['id']}.mp4")
-        if os.path.exists(transcode_file):
-            os.remove(transcode_file)
-        convert_file = os.path.join(CONVERT_DIR, f"{entry['id']}.jpg")
-        if os.path.exists(convert_file):
-            os.remove(convert_file)
+        # Add to trash DB table
+        add_to_trash({
+            "id": entry["id"],
+            "filename": entry["filename"],
+            "original_path": entry["path"],
+            "trash_path": trash_filename if file_moved else "",
+            "folder": entry["folder"],
+            "type": entry["type"],
+            "width": entry["width"],
+            "height": entry["height"],
+            "file_size": entry["file_size"],
+            "date_taken": entry.get("date_taken"),
+            "location": entry.get("location"),
+            "camera": entry.get("camera"),
+            "lens": entry.get("lens"),
+            "iso": entry.get("iso"),
+            "aperture": entry.get("aperture"),
+            "shutter_speed": entry.get("shutter_speed"),
+            "gps_lat": entry.get("gps_lat"),
+            "gps_lng": entry.get("gps_lng"),
+            "thumbnail_path": entry.get("thumbnail_path"),
+            "file_hash": entry.get("file_hash"),
+            "file_modified_at": entry.get("file_modified_at"),
+        })
 
-    return {"deleted": len(removed), "deletedFromDisk": deleted_from_disk, "ids": [r["id"] for r in removed]}
+    return {"deleted": len(removed), "movedToTrash": moved_to_trash, "ids": [r["id"] for r in removed]}
+
+
+# ── Trash endpoints ───────────────────────────────────────────────
+
+@app.get("/api/trash")
+def list_trash():
+    """List all items currently in the trash."""
+    items = get_trash_items()
+    return {
+        "items": [_format_trash_item(i) for i in items],
+        "total": len(items),
+    }
+
+
+@app.get("/api/trash/thumbnails/{item_id}")
+def get_trash_thumbnail(item_id: str):
+    """Serve thumbnail for a trashed item (thumbnails are kept until permanent delete)."""
+    item = get_trash_item_by_id(item_id)
+    if not item or not item.get("thumbnail_path"):
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+    thumb_path = os.path.join(THUMB_DIR, item["thumbnail_path"])
+    if not os.path.exists(thumb_path):
+        raise HTTPException(status_code=404, detail="Thumbnail file missing")
+
+    return FileResponse(thumb_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=2592000"})
+
+
+class RestoreRequest(BaseModel):
+    ids: list[str]
+
+
+@app.post("/api/trash/restore")
+def restore_from_trash(req: RestoreRequest):
+    """Restore items from trash back to their original location."""
+    items = remove_from_trash(req.ids)
+    restored = 0
+
+    for item in items:
+        trash_file = os.path.join(TRASH_DIR, item["trash_path"]) if item.get("trash_path") else None
+        original_path = os.path.join(PHOTOS_DIR, item["original_path"])
+
+        if trash_file and os.path.exists(trash_file):
+            try:
+                os.makedirs(os.path.dirname(original_path), exist_ok=True)
+                shutil.move(trash_file, original_path)
+                restored += 1
+                logger.info(f"Restored from trash: {item['original_path']}")
+
+                # Re-add to photos DB so it shows up immediately
+                upsert_photo({
+                    "id": item["id"],
+                    "filename": item["filename"],
+                    "path": item["original_path"],
+                    "folder": item["folder"],
+                    "type": item["type"],
+                    "width": item["width"],
+                    "height": item["height"],
+                    "file_size": item["file_size"],
+                    "date_taken": item.get("date_taken"),
+                    "location": item.get("location"),
+                    "camera": item.get("camera"),
+                    "lens": item.get("lens"),
+                    "iso": item.get("iso"),
+                    "aperture": item.get("aperture"),
+                    "shutter_speed": item.get("shutter_speed"),
+                    "gps_lat": item.get("gps_lat"),
+                    "gps_lng": item.get("gps_lng"),
+                    "thumbnail_path": item.get("thumbnail_path"),
+                    "file_hash": item.get("file_hash"),
+                    "file_modified_at": item.get("file_modified_at"),
+                })
+            except OSError as e:
+                logger.warning(f"Failed to restore {item['original_path']}: {e}")
+
+    return {"restored": restored, "ids": [i["id"] for i in items]}
+
+
+class EmptyTrashRequest(BaseModel):
+    ids: Optional[list[str]] = None  # None = empty all
+
+
+@app.post("/api/trash/empty")
+def empty_trash(req: EmptyTrashRequest):
+    """Permanently delete items from trash. Pass ids=null to empty all."""
+    if req.ids:
+        items = remove_from_trash(req.ids)
+    else:
+        items = get_trash_items()
+        remove_from_trash([i["id"] for i in items])
+
+    deleted = 0
+    for item in items:
+        # Delete the trashed file
+        if item.get("trash_path"):
+            trash_file = os.path.join(TRASH_DIR, item["trash_path"])
+            if os.path.exists(trash_file):
+                try:
+                    os.remove(trash_file)
+                    deleted += 1
+                except OSError as e:
+                    logger.warning(f"Failed to permanently delete {trash_file}: {e}")
+
+        # Clean up cached files
+        _cleanup_cached_files(item["id"], item.get("thumbnail_path"))
+
+    return {"deleted": deleted}
 
 
 @app.post("/api/reindex")
