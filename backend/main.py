@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes
-from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR
+from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, generate_thumbnail, generate_video_thumbnail
 
 logger = logging.getLogger("snapvault")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -156,12 +156,26 @@ def get_photo(photo_id: str):
 @app.get("/api/thumbnails/{photo_id}")
 def get_thumbnail(photo_id: str):
     photo = get_photo_by_id(photo_id)
-    if not photo or not photo.get("thumbnail_path"):
-        raise HTTPException(status_code=404, detail="Thumbnail not found")
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
 
-    thumb_path = os.path.join(THUMB_DIR, photo["thumbnail_path"])
-    if not os.path.exists(thumb_path):
-        raise HTTPException(status_code=404, detail="Thumbnail file missing")
+    filepath = os.path.join(PHOTOS_DIR, photo["path"])
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    thumb_path = None
+    if photo.get("thumbnail_path"):
+        thumb_path = os.path.join(THUMB_DIR, photo["thumbnail_path"])
+
+    if not thumb_path or not os.path.exists(thumb_path):
+        regenerated_rel = (
+            generate_video_thumbnail(filepath, photo_id)
+            if photo.get("type") == "video"
+            else generate_thumbnail(filepath, photo_id)
+        )
+        if not regenerated_rel:
+            raise HTTPException(status_code=404, detail="Thumbnail file missing")
+        thumb_path = os.path.join(THUMB_DIR, regenerated_rel)
 
     return FileResponse(thumb_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=2592000"})
 

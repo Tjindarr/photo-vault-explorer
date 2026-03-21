@@ -334,8 +334,12 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
 
         fhash = file_hash(str(filepath))
 
-        # Skip if already indexed with same hash
-        if rel_path in known_hashes and known_hashes[rel_path] == fhash:
+        photo_id = hashlib.md5(rel_path.encode()).hexdigest()[:16]
+        expected_thumb_rel = f"{photo_id[:2]}/{photo_id}.jpg"
+        expected_thumb_path = os.path.join(THUMB_DIR, expected_thumb_rel)
+
+        # Skip only when the file is unchanged and its cached thumbnail still exists
+        if rel_path in known_hashes and known_hashes[rel_path] == fhash and os.path.exists(expected_thumb_path):
             yield None
             continue
 
