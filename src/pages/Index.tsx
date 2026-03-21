@@ -6,6 +6,7 @@ import SearchBar from '@/components/SearchBar';
 import PhotoGrid from '@/components/PhotoGrid';
 import PhotoMap from '@/components/PhotoMap';
 import StatsDashboard from '@/components/StatsDashboard';
+import DuplicatesView from '@/components/DuplicatesView';
 import PhotoViewer from '@/components/PhotoViewer';
 import { type Photo, type Folder } from '@/lib/mock-data';
 import { fetchPhotos, fetchFolders, fetchMapPhotos, fetchStats, isApiAvailable } from '@/lib/api-client';
@@ -132,7 +133,8 @@ export default function Index() {
           </div>
           <div className={cn(
             "flex-1 min-h-0 px-3 sm:px-5",
-            viewMode !== 'grid' && "overflow-y-auto scrollbar-thin pb-6"
+            viewMode !== 'grid' && "overflow-y-auto scrollbar-thin pb-6",
+            viewMode === 'duplicates' && "overflow-hidden"
           )}>
             {loading ? (
               <div className="flex items-center justify-center h-full">
@@ -151,6 +153,8 @@ export default function Index() {
               />
             ) : viewMode === 'map' ? (
               <PhotoMap photos={mapPhotos} onSelect={setSelectedPhoto} />
+            ) : viewMode === 'duplicates' ? (
+              <DuplicatesView onSelect={setSelectedPhoto} />
             ) : (
               <StatsDashboard stats={stats} />
             )}
