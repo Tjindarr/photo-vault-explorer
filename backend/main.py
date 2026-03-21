@@ -484,9 +484,21 @@ class DeletePhotosRequest(BaseModel):
 
 @app.post("/api/photos/delete")
 def delete_photos_endpoint(req: DeletePhotosRequest):
-    """Delete photos by ID — removes DB entries, thumbnails, transcoded & converted files."""
+    """Delete photos by ID — removes source files, DB entries, and all cached files."""
     removed = delete_photos_by_ids(req.ids)
+    deleted_from_disk = 0
     for entry in removed:
+        # Delete original file from disk
+        source_file = os.path.join(PHOTOS_DIR, entry["path"])
+        if os.path.exists(source_file):
+            try:
+                os.remove(source_file)
+                deleted_from_disk += 1
+                logger.info(f"Deleted source file: {entry['path']}")
+            except OSError as e:
+                logger.warning(f"Failed to delete source file {entry['path']}: {e}")
+
+        # Delete cached files
         if entry.get("thumbnail_path"):
             thumb_file = os.path.join(THUMB_DIR, entry["thumbnail_path"])
             if os.path.exists(thumb_file):
@@ -498,7 +510,7 @@ def delete_photos_endpoint(req: DeletePhotosRequest):
         if os.path.exists(convert_file):
             os.remove(convert_file)
 
-    return {"deleted": len(removed), "ids": [r["id"] for r in removed]}
+    return {"deleted": len(removed), "deletedFromDisk": deleted_from_disk, "ids": [r["id"] for r in removed]}
 
 
 @app.post("/api/reindex")

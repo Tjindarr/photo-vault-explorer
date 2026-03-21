@@ -65,7 +65,7 @@ export default function DuplicatesView({ onSelect }: { onSelect: (photo: Photo) 
 
   const handleDeleteSelected = async () => {
     if (selected.size === 0 || deleting) return;
-    const confirmMsg = `Are you sure you want to delete ${selected.size} duplicate photo(s)? This removes them from the database only — original files on disk are NOT deleted.`;
+    const confirmMsg = `Are you sure you want to permanently delete ${selected.size} duplicate file(s) from disk? This cannot be undone!`;
     if (!confirm(confirmMsg)) return;
 
     setDeleting(true);
@@ -151,10 +151,10 @@ export default function DuplicatesView({ onSelect }: { onSelect: (photo: Photo) 
       </div>
 
       {/* Warning */}
-      <div className="shrink-0 flex items-start gap-2 rounded-lg bg-accent/10 border border-accent/20 p-3 mb-3 text-xs text-accent-foreground">
-        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-accent" />
+      <div className="shrink-0 flex items-start gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 mb-3 text-xs text-foreground">
+        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-destructive" />
         <span>
-          Deleting removes entries from the ImgVault database and cached files only. Original files on disk are <strong>not deleted</strong>.
+          Deleting duplicates will <strong>permanently remove the files from disk</strong>. This cannot be undone.
           Use "Auto-select duplicates" to mark extras (keeps the newest in each group).
         </span>
       </div>
