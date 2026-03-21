@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 import exifread
-from PIL import Image, ExifTags
+from PIL import Image, ExifTags, ImageOps
 from pillow_heif import register_heif_opener
 
 # Register HEIC/HEIF support with Pillow
