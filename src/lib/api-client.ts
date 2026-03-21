@@ -167,4 +167,34 @@ export async function deletePhotos(ids: string[]): Promise<{ deleted: number }> 
   return res.json();
 }
 
+export async function fetchTrash(): Promise<{
+  items: { id: string; filename: string; originalPath: string; folder: string; type: string; width: number; height: number; thumbnailUrl: string | null; fileSize: number; deletedAt: string; metadata: { dateTaken: string | null; location: string | null; camera: string | null } }[];
+  total: number;
+}> {
+  if (!(await isApiAvailable())) return { items: [], total: 0 };
+  const res = await fetch(`${API_BASE}/trash`);
+  if (!res.ok) throw new Error('Failed to fetch trash');
+  return res.json();
+}
+
+export async function restoreFromTrash(ids: string[]): Promise<{ restored: number }> {
+  const res = await fetch(`${API_BASE}/trash/restore`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+  if (!res.ok) throw new Error('Failed to restore from trash');
+  return res.json();
+}
+
+export async function emptyTrash(ids?: string[]): Promise<{ deleted: number }> {
+  const res = await fetch(`${API_BASE}/trash/empty`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids: ids || null }),
+  });
+  if (!res.ok) throw new Error('Failed to empty trash');
+  return res.json();
+}
+
 export { isApiAvailable };

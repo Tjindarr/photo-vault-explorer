@@ -49,6 +49,33 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_photos_type ON photos(type);
         CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(path);
         CREATE INDEX IF NOT EXISTS idx_photos_file_hash ON photos(file_hash);
+
+        CREATE TABLE IF NOT EXISTS trash (
+            id TEXT PRIMARY KEY,
+            filename TEXT NOT NULL,
+            original_path TEXT NOT NULL,
+            trash_path TEXT NOT NULL,
+            folder TEXT NOT NULL,
+            type TEXT NOT NULL DEFAULT 'image',
+            width INTEGER DEFAULT 0,
+            height INTEGER DEFAULT 0,
+            file_size INTEGER DEFAULT 0,
+            date_taken TEXT,
+            location TEXT,
+            camera TEXT,
+            lens TEXT,
+            iso INTEGER,
+            aperture TEXT,
+            shutter_speed TEXT,
+            gps_lat REAL,
+            gps_lng REAL,
+            thumbnail_path TEXT,
+            file_hash TEXT,
+            file_modified_at TEXT,
+            deleted_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_trash_deleted_at ON trash(deleted_at);
     """)
     conn.commit()
     conn.close()
@@ -315,7 +342,7 @@ def get_duplicate_photos() -> list[dict]:
 
 
 def delete_photos_by_ids(photo_ids: list[str]) -> list[dict]:
-    """Delete photos by ID. Returns removed entries with paths for cleanup."""
+    """Delete photos by ID. Returns removed entries with full data for trash."""
     if not photo_ids:
         return []
 
@@ -324,14 +351,11 @@ def delete_photos_by_ids(photo_ids: list[str]) -> list[dict]:
 
     conn = get_db()
     rows = conn.execute(
-        f"SELECT path, id, thumbnail_path FROM photos WHERE id IN ({placeholders})",
+        f"SELECT * FROM photos WHERE id IN ({placeholders})",
         unique_ids,
     ).fetchall()
 
-    removed_info = [
-        {"path": row["path"], "id": row["id"], "thumbnail_path": row["thumbnail_path"]}
-        for row in rows
-    ]
+    removed_info = [dict(row) for row in rows]
 
     if removed_info:
         conn.executemany("DELETE FROM photos WHERE id = ?", [(row["id"],) for row in removed_info])
@@ -339,3 +363,65 @@ def delete_photos_by_ids(photo_ids: list[str]) -> list[dict]:
 
     conn.close()
     return removed_info
+
+
+# ── Trash operations ──────────────────────────────────────────────
+
+def add_to_trash(entry: dict):
+    """Insert a record into the trash table."""
+    conn = get_db()
+    conn.execute("""
+        INSERT OR REPLACE INTO trash (id, filename, original_path, trash_path, folder, type,
+            width, height, file_size, date_taken, location, camera, lens, iso, aperture,
+            shutter_speed, gps_lat, gps_lng, thumbnail_path, file_hash, file_modified_at)
+        VALUES (:id, :filename, :original_path, :trash_path, :folder, :type,
+            :width, :height, :file_size, :date_taken, :location, :camera, :lens, :iso, :aperture,
+            :shutter_speed, :gps_lat, :gps_lng, :thumbnail_path, :file_hash, :file_modified_at)
+    """, entry)
+    conn.commit()
+    conn.close()
+
+
+def get_trash_items() -> list[dict]:
+    """Get all items in the trash, ordered by deletion date."""
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM trash ORDER BY deleted_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_trash_item_by_id(item_id: str) -> Optional[dict]:
+    conn = get_db()
+    row = conn.execute("SELECT * FROM trash WHERE id = ?", (item_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def remove_from_trash(item_ids: list[str]) -> list[dict]:
+    """Remove items from trash table. Returns the removed entries."""
+    if not item_ids:
+        return []
+    placeholders = ",".join("?" for _ in item_ids)
+    conn = get_db()
+    rows = conn.execute(f"SELECT * FROM trash WHERE id IN ({placeholders})", item_ids).fetchall()
+    removed = [dict(r) for r in rows]
+    if removed:
+        conn.executemany("DELETE FROM trash WHERE id = ?", [(r["id"],) for r in removed])
+        conn.commit()
+    conn.close()
+    return removed
+
+
+def purge_expired_trash(days: int = 30) -> list[dict]:
+    """Remove trash items older than N days. Returns purged entries."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM trash WHERE deleted_at < datetime('now', ?)",
+        (f"-{days} days",),
+    ).fetchall()
+    expired = [dict(r) for r in rows]
+    if expired:
+        conn.executemany("DELETE FROM trash WHERE id = ?", [(r["id"],) for r in expired])
+        conn.commit()
+    conn.close()
+    return expired
