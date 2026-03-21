@@ -42,6 +42,12 @@ function buildRows(photos: Photo[], cols: number): GridRow[] {
 
 function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo) => void }) {
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  // Fall back to full image if no thumbnail, then to nothing
+  const imgSrc = error
+    ? (photo.thumbnailUrl ? photo.fullUrl : null)
+    : (photo.thumbnailUrl || photo.fullUrl);
 
   return (
     <button
@@ -49,18 +55,32 @@ function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo
       className="group relative overflow-hidden bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 outline-none active:scale-[0.97] transition-transform duration-150"
       style={{ borderRadius: 'var(--thumb-radius)', aspectRatio: '1' }}
     >
-      <img
-        src={photo.thumbnailUrl}
-        alt={photo.filename}
-        loading="lazy"
-        onLoad={() => setLoaded(true)}
-        className={cn(
-          'absolute inset-0 w-full h-full object-cover transition-all duration-500',
-          loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105',
-          'group-hover:scale-[1.03] group-hover:brightness-110',
-        )}
-      />
-      {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
+      {imgSrc ? (
+        <img
+          src={imgSrc}
+          alt={photo.filename}
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            if (!error) setError(true);
+            else setLoaded(true); // give up, show placeholder
+          }}
+          className={cn(
+            'absolute inset-0 w-full h-full object-cover transition-all duration-500',
+            loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105',
+            'group-hover:scale-[1.03] group-hover:brightness-110',
+          )}
+        />
+      ) : null}
+      {(!loaded || !imgSrc) && (
+        <div className="absolute inset-0 bg-muted flex items-center justify-center">
+          {!imgSrc || error ? (
+            <span className="text-[10px] text-muted-foreground truncate px-2">{photo.filename}</span>
+          ) : (
+            <div className="w-full h-full animate-pulse bg-muted" />
+          )}
+        </div>
+      )}
 
       {photo.type === 'video' && (
         <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-overlay/70 backdrop-blur-sm">
