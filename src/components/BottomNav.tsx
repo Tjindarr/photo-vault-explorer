@@ -1,4 +1,4 @@
-import { LayoutGrid, Map, Copy, Trash2, BarChart3 } from 'lucide-react';
+import { LayoutGrid, Map, Copy, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ViewMode } from '@/components/AppHeader';
 
@@ -12,12 +12,11 @@ const tabs: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
   { mode: 'map', icon: Map, label: 'Map' },
   { mode: 'duplicates', icon: Copy, label: 'Dupes' },
   { mode: 'trash', icon: Trash2, label: 'Trash' },
-  { mode: 'stats', icon: BarChart3, label: 'Stats' },
 ];
 
 export default function BottomNav({ viewMode, onViewModeChange }: BottomNavProps) {
   return (
-    <nav className="lg:hidden shrink-0 border-t border-border bg-surface/95 backdrop-blur-md">
+    <nav className="lg:hidden shrink-0 border-t border-border bg-surface/95 backdrop-blur-md pb-2">
       <div className="flex items-stretch">
         {tabs.map(({ mode, icon: Icon, label }) => {
           const active = viewMode === mode;
