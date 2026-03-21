@@ -154,6 +154,15 @@ export default function Index() {
         onToggleSidebar={() => setSidebarOpen(true)}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
+        deleteMode={deleteMode}
+        onDeleteModeChange={(on) => {
+          setDeleteMode(on);
+          if (!on) setSelectedIds(new Set());
+        }}
+        selectedCount={selectedIds.size}
+        onDeleteSelected={handleDeleteSelected}
       />
       <div className="flex flex-1 min-h-0">
         <FolderSidebar
@@ -165,13 +174,11 @@ export default function Index() {
         />
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden lg:pb-0">
           {(viewMode === 'grid' || viewMode === 'map') && (
-            <div className="px-3 sm:px-5 pt-3 sm:pt-4 pb-2 space-y-2">
+            <div className="px-3 sm:px-5 pt-3 sm:pt-4 pb-2">
               <SearchBar
                 value={searchQuery}
                 onChange={setSearchQuery}
                 resultCount={totalCount}
-                typeFilter={typeFilter}
-                onTypeFilterChange={setTypeFilter}
               />
             </div>
           )}
@@ -204,11 +211,6 @@ export default function Index() {
                     return next;
                   });
                 }}
-                onDeleteModeChange={(on) => {
-                  setDeleteMode(on);
-                  if (!on) setSelectedIds(new Set());
-                }}
-                onDeleteSelected={handleDeleteSelected}
               />
             ) : viewMode === 'map' ? (
               <PhotoMap photos={mapPhotos} onSelect={setSelectedPhoto} />
