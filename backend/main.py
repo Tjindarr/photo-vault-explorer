@@ -32,7 +32,7 @@ def run_indexer():
         known_hashes = get_indexed_hashes()
         logger.info(f"Found {len(known_hashes)} already-indexed files in DB")
 
-        existing_paths = set(known_hashes.keys())
+        existing_paths = set()
         count = 0
         skipped = 0
 
