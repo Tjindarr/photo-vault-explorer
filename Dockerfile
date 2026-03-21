@@ -22,7 +22,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Create data directories
-RUN mkdir -p /data/photos /data/thumbnails /data/db
+RUN mkdir -p /data/photos /data/thumbnails /data/db /data/transcoded /data/converted
 
 # ---- Python backend ----
 WORKDIR /app/backend
@@ -43,6 +43,8 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/snapvault.conf
 ENV PHOTOS_DIR=/data/photos
 ENV THUMB_DIR=/data/thumbnails
 ENV DB_PATH=/data/db/snapvault.db
+ENV TRANSCODE_DIR=/data/transcoded
+ENV CONVERT_DIR=/data/converted
 
 EXPOSE 8080
 
