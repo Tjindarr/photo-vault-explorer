@@ -109,7 +109,7 @@ function PhotoThumbnail({ photo, onSelect }: { photo: Photo; onSelect: (p: Photo
   );
 }
 
-export default function PhotoGrid({ photos, onSelect }: PhotoGridProps) {
+export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLoadMore }: PhotoGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(4);
 
