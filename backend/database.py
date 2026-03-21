@@ -91,6 +91,33 @@ def remove_missing_photos(existing_paths: set[str]):
     return removed_info
 
 
+def remove_photos_by_paths(paths: list[str]):
+    """Remove specific DB entries by path. Returns list of removed (path, id, thumbnail_path)."""
+    if not paths:
+        return []
+
+    unique_paths = list(dict.fromkeys(paths))
+    placeholders = ",".join("?" for _ in unique_paths)
+
+    conn = get_db()
+    rows = conn.execute(
+        f"SELECT path, id, thumbnail_path FROM photos WHERE path IN ({placeholders})",
+        unique_paths,
+    ).fetchall()
+
+    removed_info = [
+        {"path": row["path"], "id": row["id"], "thumbnail_path": row["thumbnail_path"]}
+        for row in rows
+    ]
+
+    if removed_info:
+        conn.executemany("DELETE FROM photos WHERE path = ?", [(row["path"],) for row in removed_info])
+        conn.commit()
+
+    conn.close()
+    return removed_info
+
+
 def search_photos(
     query: Optional[str] = None,
     folder: Optional[str] = None,
