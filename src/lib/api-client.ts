@@ -88,6 +88,42 @@ export async function fetchStats(): Promise<any> {
   return res.json();
 }
 
+export async function fetchMapPhotos(params: {
+  query?: string;
+  folder?: string;
+  limit?: number;
+}): Promise<{ items: Photo[]; total: number }> {
+  if (!(await isApiAvailable())) {
+    let photos = [...mockPhotos];
+
+    if (params.folder) {
+      photos = photos.filter((p) => p.folder.startsWith(params.folder!));
+    }
+    if (params.query) {
+      const q = params.query.toLowerCase();
+      photos = photos.filter((p) =>
+        p.filename.toLowerCase().includes(q) ||
+        p.metadata.location?.toLowerCase().includes(q) ||
+        p.metadata.camera?.toLowerCase().includes(q) ||
+        p.folder.toLowerCase().includes(q)
+      );
+    }
+
+    photos = photos.filter((p) => p.metadata.gpsLat != null && p.metadata.gpsLng != null);
+    const limit = params.limit || 20000;
+    return { items: photos.slice(0, limit), total: photos.length };
+  }
+
+  const searchParams = new URLSearchParams();
+  if (params.query) searchParams.set('q', params.query);
+  if (params.folder) searchParams.set('folder', params.folder);
+  if (params.limit) searchParams.set('limit', String(params.limit));
+
+  const res = await fetch(`${API_BASE}/map-photos?${searchParams}`);
+  if (!res.ok) throw new Error('Failed to fetch map photos');
+  return res.json();
+}
+
 export async function triggerReindex(): Promise<{ message: string }> {
   const res = await fetch(`${API_BASE}/reindex`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to trigger reindex');
