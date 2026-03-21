@@ -15,8 +15,6 @@ interface PhotoGridProps {
   deleteMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
-  onDeleteModeChange?: (on: boolean) => void;
-  onDeleteSelected?: () => void;
 }
 
 // A row is either a date header or a row of photo thumbnails
@@ -140,7 +138,7 @@ function PhotoThumbnail({ photo, onSelect, deleteMode, selected, onToggleSelect 
   );
 }
 
-export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLoadMore, deleteMode, selectedIds, onToggleSelect, onDeleteModeChange, onDeleteSelected }: PhotoGridProps) {
+export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLoadMore, deleteMode, selectedIds, onToggleSelect }: PhotoGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(4);
 
@@ -213,28 +211,6 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
 
   return (
     <div className="h-full flex flex-col">
-      {/* Delete mode toolbar */}
-      <div className="shrink-0 flex items-center gap-3 px-1 py-2">
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={deleteMode || false}
-            onCheckedChange={(checked) => onDeleteModeChange?.(checked)}
-            className="data-[state=checked]:bg-destructive"
-          />
-          <span className="text-xs text-muted-foreground font-medium">Delete mode</span>
-        </div>
-        {deleteMode && selectedIds && selectedIds.size > 0 && (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onDeleteSelected}
-            className="gap-1.5"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete {selectedIds.size} selected
-          </Button>
-        )}
-      </div>
       <div ref={containerRef} className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
       <div
         style={{
