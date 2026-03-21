@@ -65,7 +65,7 @@ export default function DuplicatesView({ onSelect }: { onSelect: (photo: Photo) 
 
   const handleDeleteSelected = async () => {
     if (selected.size === 0 || deleting) return;
-    const confirmMsg = `Are you sure you want to delete ${selected.size} duplicate photo(s)? This removes them from the database only — original files on disk are NOT deleted.`;
+    const confirmMsg = `Are you sure you want to permanently delete ${selected.size} duplicate file(s) from disk? This cannot be undone!`;
     if (!confirm(confirmMsg)) return;
 
     setDeleting(true);
