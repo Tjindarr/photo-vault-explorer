@@ -11,9 +11,6 @@ if ('serviceWorker' in navigator) {
     wb.addEventListener('waiting', () => {
       wb.messageSkipWaiting();
     });
-    wb.addEventListener('externalwaiting', () => {
-      wb.messageSkipWaiting();
-    });
     await wb.register();
   });
 }
