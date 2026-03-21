@@ -24,11 +24,11 @@ function useTheme() {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem('snapvault-theme', next ? 'dark' : 'light');
+    localStorage.setItem('imgvault-theme', next ? 'dark' : 'light');
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem('snapvault-theme');
+    const saved = localStorage.getItem('imgvault-theme');
     if (saved === 'light') {
       setDark(false);
       document.documentElement.classList.remove('dark');
