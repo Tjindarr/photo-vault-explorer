@@ -249,3 +249,42 @@ def get_stats() -> dict:
         "byLocation": by_location,
         "byYear": by_year,
     }
+
+
+def get_map_photos(
+    query: Optional[str] = None,
+    folder: Optional[str] = None,
+    limit: int = 20000,
+) -> list[dict]:
+    conn = get_db()
+    conditions = ["gps_lat IS NOT NULL", "gps_lng IS NOT NULL"]
+    params = []
+
+    if query:
+        conditions.append(
+            "(filename LIKE ? OR location LIKE ? OR camera LIKE ? OR folder LIKE ?)"
+        )
+        q = f"%{query}%"
+        params.extend([q, q, q, q])
+
+    if folder:
+        conditions.append("folder LIKE ?")
+        params.append(f"{folder}%")
+
+    where = " AND ".join(conditions)
+
+    rows = conn.execute(
+        f"""
+        SELECT id, filename, path, folder, type, width, height, file_size,
+               date_taken, location, camera, lens, iso, aperture,
+               shutter_speed, gps_lat, gps_lng, thumbnail_path, file_modified_at
+        FROM photos
+        WHERE {where}
+        ORDER BY date_taken DESC
+        LIMIT ?
+        """,
+        params + [limit],
+    ).fetchall()
+
+    conn.close()
+    return [dict(r) for r in rows]
