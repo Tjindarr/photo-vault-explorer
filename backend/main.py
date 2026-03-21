@@ -477,17 +477,6 @@ def list_duplicates():
     return {"groups": result, "totalGroups": len(result), "totalDuplicates": total_duplicates}
 
 
-@app.delete("/api/photos")
-def delete_photos(request: Request):
-    import json
-    body = json.loads(request._receive)
-    # This won't work with FastAPI, need proper body parsing
-    pass
-
-
-from pydantic import BaseModel
-
-
 class DeletePhotosRequest(BaseModel):
     ids: list[str]
 
