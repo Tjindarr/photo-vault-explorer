@@ -7,7 +7,6 @@ import PhotoGrid from '@/components/PhotoGrid';
 import PhotoMap from '@/components/PhotoMap';
 import StatsDashboard from '@/components/StatsDashboard';
 import PhotoViewer from '@/components/PhotoViewer';
-import TimelineSlider from '@/components/TimelineSlider';
 import { type Photo, type Folder } from '@/lib/mock-data';
 import { fetchPhotos, fetchFolders, isApiAvailable } from '@/lib/api-client';
 
@@ -18,7 +17,6 @@ export default function Index() {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [dateRange, setDateRange] = useState<[Date, Date] | null>(null);
 
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -86,31 +84,6 @@ export default function Index() {
       );
     }
 
-    if (dateRange) {
-      photos = photos.filter((p) => {
-        if (!p.metadata.dateTaken) return false;
-        const d = new Date(p.metadata.dateTaken);
-        return d >= dateRange[0] && d <= dateRange[1];
-      });
-    }
-
-    return photos;
-  }, [allPhotos, selectedFolder, searchQuery, dateRange]);
-
-  const photosBeforeDateFilter = useMemo(() => {
-    let photos = allPhotos;
-    if (selectedFolder) photos = photos.filter((p) => p.folder.startsWith(selectedFolder));
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      photos = photos.filter((p) =>
-        p.filename.toLowerCase().includes(q) ||
-        p.metadata.location?.toLowerCase().includes(q) ||
-        p.metadata.camera?.toLowerCase().includes(q) ||
-        p.metadata.dateTaken?.includes(q) ||
-        p.folder.toLowerCase().includes(q) ||
-        p.type.toLowerCase().includes(q)
-      );
-    }
     return photos;
   }, [allPhotos, selectedFolder, searchQuery]);
 
@@ -136,24 +109,6 @@ export default function Index() {
               onChange={setSearchQuery}
               resultCount={filteredPhotos.length}
             />
-            {dateRange && (
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-sm fade-in">
-                <div className="min-w-0">
-                  <p className="font-medium text-foreground">Timeline filter is active</p>
-                  <p className="text-muted-foreground text-xs sm:text-sm truncate">
-                    Showing {dateRange[0].toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                    {' — '}
-                    {dateRange[1].toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setDateRange(null)}
-                  className="shrink-0 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary active:scale-95"
-                >
-                  Clear filter
-                </button>
-              </div>
-            )}
           </div>
           <div className={cn(
             "flex-1 min-h-0 px-3 sm:px-5",
@@ -174,11 +129,6 @@ export default function Index() {
               <StatsDashboard photos={filteredPhotos} />
             )}
           </div>
-          <TimelineSlider
-            photos={photosBeforeDateFilter}
-            dateRange={dateRange}
-            onDateRangeChange={setDateRange}
-          />
         </main>
       </div>
 
