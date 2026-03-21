@@ -11,13 +11,24 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes
-from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, generate_thumbnail, generate_video_thumbnail
+from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 
 logger = logging.getLogger("snapvault")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 # Track indexing state
 indexing_status = {"running": False, "progress": 0, "total": 0, "last_run": None}
+
+
+def get_current_media_paths() -> set[str]:
+    """Return all current media paths on disk relative to PHOTOS_DIR."""
+    current_paths = set()
+    for root, _, files in os.walk(PHOTOS_DIR):
+        for filename in files:
+            if os.path.splitext(filename)[1].lower() in ALL_EXTENSIONS:
+                full_path = os.path.join(root, filename)
+                current_paths.add(os.path.relpath(full_path, PHOTOS_DIR))
+    return current_paths
 
 
 def run_indexer():
@@ -32,7 +43,9 @@ def run_indexer():
         known_hashes = get_indexed_hashes()
         logger.info(f"Found {len(known_hashes)} already-indexed files in DB")
 
-        existing_paths = set()
+        current_paths = get_current_media_paths()
+        logger.info(f"Found {len(current_paths)} media files on disk")
+
         count = 0
         skipped = 0
 
@@ -42,7 +55,6 @@ def run_indexer():
                 continue
 
             upsert_photo(photo)
-            existing_paths.add(photo["path"])
             count += 1
             indexing_status["progress"] = count
             indexing_status["total"] = count
@@ -51,7 +63,7 @@ def run_indexer():
                 logger.info(f"Indexed {count} new/changed files ({skipped} skipped)...")
 
         # Clean up removed files (DB entries + thumbnail/transcode files)
-        removed = remove_missing_photos(existing_paths)
+        removed = remove_missing_photos(current_paths)
         if removed:
             for entry in removed:
                 # Remove thumbnail
