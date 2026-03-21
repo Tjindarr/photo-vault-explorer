@@ -1,7 +1,7 @@
-import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2 } from 'lucide-react';
+import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, useCallback } from 'react';
-import { fetchIndexStatus } from '@/lib/api-client';
+import { fetchIndexStatus, triggerReindex } from '@/lib/api-client';
 
 export type ViewMode = 'grid' | 'map' | 'stats';
 
@@ -50,7 +50,9 @@ function useIndexStatus() {
     try {
       const s = await fetchIndexStatus();
       setStatus(s);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -59,12 +61,26 @@ function useIndexStatus() {
     return () => clearInterval(id);
   }, [poll]);
 
-  return status;
+  return { status, refresh: poll };
 }
 
 export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange }: AppHeaderProps) {
   const { dark, toggle } = useTheme();
-  const indexStatus = useIndexStatus();
+  const { status: indexStatus, refresh } = useIndexStatus();
+  const [reindexing, setReindexing] = useState(false);
+
+  const handleReindex = async () => {
+    if (indexStatus.running || reindexing) return;
+    try {
+      setReindexing(true);
+      await triggerReindex();
+      await refresh();
+    } catch (error) {
+      console.error('Failed to trigger reindex:', error);
+    } finally {
+      setReindexing(false);
+    }
+  };
 
   return (
     <header className="shrink-0 border-b border-border bg-surface">
@@ -96,6 +112,21 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange 
         )}
 
         <div className="flex-1" />
+
+        <button
+          onClick={handleReindex}
+          disabled={indexStatus.running || reindexing}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium transition-colors active:scale-95',
+            indexStatus.running || reindexing
+              ? 'cursor-not-allowed bg-muted text-muted-foreground'
+              : 'bg-surface text-foreground hover:bg-secondary'
+          )}
+          aria-label="Reindex all files"
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', (indexStatus.running || reindexing) && 'animate-spin')} />
+          <span className="hidden sm:inline">Reindex all</span>
+        </button>
 
         <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {views.map(({ mode, icon: Icon, label }) => (
