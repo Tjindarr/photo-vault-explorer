@@ -18,9 +18,10 @@ const tabs: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
 export default function BottomNav({ viewMode, onViewModeChange }: BottomNavProps) {
   return (
     <nav
-      className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]"
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur-md"
+      style={{ paddingBottom: 'max(0.25rem, calc(env(safe-area-inset-bottom) - 20px))' }}
     >
-      <div className="flex items-stretch">
+      <div className="flex items-stretch pt-1">
         {tabs.map(({ mode, icon: Icon, label }) => {
           const active = viewMode === mode;
           return (
@@ -28,7 +29,7 @@ export default function BottomNav({ viewMode, onViewModeChange }: BottomNavProps
               key={mode}
               onClick={() => onViewModeChange(mode)}
               className={cn(
-                'flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors active:scale-95',
+                'flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors active:scale-95',
                 active ? 'text-primary' : 'text-muted-foreground'
               )}
             >
