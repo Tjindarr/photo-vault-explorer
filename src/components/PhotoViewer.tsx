@@ -96,17 +96,33 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate }: Phot
         </button>
       )}
 
-      {/* Image */}
+      {/* Image or Video */}
       <div className={cn('flex-1 flex items-center justify-center p-12 transition-all duration-300', showInfo && 'mr-72')} onClick={(e) => e.stopPropagation()}>
-        <img
-          src={photo.fullUrl}
-          alt={photo.filename}
-          onLoad={() => setLoaded(true)}
-          className={cn(
-            'max-w-full max-h-full object-contain rounded-sm transition-all duration-500',
-            loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.97]',
-          )}
-        />
+        {photo.type === 'video' ? (
+          <video
+            key={photo.id}
+            src={photo.fullUrl}
+            controls
+            autoPlay
+            playsInline
+            x-webkit-airplay="allow"
+            onLoadedData={() => setLoaded(true)}
+            className={cn(
+              'max-w-full max-h-full rounded-sm transition-all duration-500',
+              loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.97]',
+            )}
+          />
+        ) : (
+          <img
+            src={photo.fullUrl}
+            alt={photo.filename}
+            onLoad={() => setLoaded(true)}
+            className={cn(
+              'max-w-full max-h-full object-contain rounded-sm transition-all duration-500',
+              loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.97]',
+            )}
+          />
+        )}
         {!loaded && (
           <div className="absolute w-12 h-12 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
         )}
