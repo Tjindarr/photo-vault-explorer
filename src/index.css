@@ -115,23 +115,18 @@
 .app-shell {
   height: 100vh;
   height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 @supports (-webkit-touch-callout: none) {
+  html, body, #root {
+    height: -webkit-fill-available;
+  }
+
   .app-shell {
     height: -webkit-fill-available;
     min-height: -webkit-fill-available;
-}
-
-@media (display-mode: standalone) {
-  :root {
-    --mobile-bottom-safe: 0px;
-  }
-}
-
-@supports (-webkit-touch-callout: none) {
-  body.standalone-pwa {
-    --mobile-bottom-safe: 0px;
   }
 }
 
