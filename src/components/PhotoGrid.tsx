@@ -1,9 +1,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Play, MapPin, Calendar, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { Play, MapPin, Calendar, CheckCircle2, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
 import type { Photo } from '@/lib/mock-data';
 
 interface PhotoGridProps {
