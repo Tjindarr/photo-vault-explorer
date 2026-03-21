@@ -108,7 +108,7 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate }: Phot
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-overlay/95 backdrop-blur-sm fade-in" onClick={onClose}>
       {/* Top bar */}
-      <div className="shrink-0 flex items-center justify-between px-4 py-3 z-10" onClick={(e) => e.stopPropagation()}>
+      <div className="shrink-0 flex items-center justify-between px-4 py-3 z-10" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }} onClick={(e) => e.stopPropagation()}>
         <div className="text-white/80 text-sm font-medium truncate max-w-[50%]">{photo.filename}</div>
         <div className="flex items-center gap-1">
           <span className="text-white/50 text-xs tabular-nums mr-2">
