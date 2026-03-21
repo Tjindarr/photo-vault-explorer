@@ -105,11 +105,23 @@
   }
 
   html, body, #root {
+    height: 100%;
     min-height: 100%;
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .app-shell {
+    min-height: -webkit-fill-available;
   }
 }
 
