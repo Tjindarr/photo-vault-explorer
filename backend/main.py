@@ -2,6 +2,8 @@ import os
 import time
 import logging
 import threading
+import subprocess
+from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query, HTTPException
@@ -154,6 +156,37 @@ def get_thumbnail(photo_id: str):
     return FileResponse(thumb_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=2592000"})
 
 
+TRANSCODE_DIR = os.environ.get("TRANSCODE_DIR", "/data/transcoded")
+os.makedirs(TRANSCODE_DIR, exist_ok=True)
+
+# Extensions that need transcoding for browser compatibility
+NEEDS_TRANSCODE = {".mov", ".avi", ".mkv", ".wmv", ".flv", ".m4v"}
+
+
+def transcode_to_mp4(source: str, photo_id: str) -> Optional[str]:
+    """Transcode a video to H.264 MP4 for browser compatibility. Returns cached path."""
+    out_path = os.path.join(TRANSCODE_DIR, f"{photo_id}.mp4")
+    if os.path.exists(out_path):
+        return out_path
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-i", source,
+                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                "-c:a", "aac", "-b:a", "128k",
+                "-movflags", "+faststart",
+                "-y", out_path,
+            ],
+            capture_output=True, timeout=600,
+        )
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+            return out_path
+        return None
+    except Exception as e:
+        logger.warning(f"Transcode failed for {source}: {e}")
+        return None
+
+
 @app.get("/api/media/{photo_id}")
 def get_media(photo_id: str):
     photo = get_photo_by_id(photo_id)
@@ -164,8 +197,19 @@ def get_media(photo_id: str):
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="File not found on disk")
 
-    # Determine media type
     ext = os.path.splitext(filepath)[1].lower()
+
+    # Transcode non-MP4 videos to H.264 for browser compatibility
+    if ext in NEEDS_TRANSCODE:
+        transcoded = transcode_to_mp4(filepath, photo_id)
+        if transcoded:
+            return FileResponse(
+                transcoded,
+                media_type="video/mp4",
+                headers={"Cache-Control": "public, max-age=604800"},
+            )
+        # Fall through to serve original if transcode fails
+
     media_types = {
         ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
         ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp",
