@@ -246,6 +246,7 @@ def generate_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
             return f"{photo_id[:2]}/{thumb_filename}"
 
         with Image.open(filepath) as img:
+            img = ImageOps.exif_transpose(img)
             img.thumbnail(THUMB_SIZE, Image.LANCZOS)
             if img.mode not in ("RGB",):
                 img = img.convert("RGB")
