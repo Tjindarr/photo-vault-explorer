@@ -154,13 +154,19 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
 
   // Infinite scroll: load more when near bottom
   useEffect(() => {
-    if (!hasMore || loadingMore || !onLoadMore) return;
-    const items = virtualizer.getVirtualItems();
-    const lastItem = items[items.length - 1];
-    if (lastItem && lastItem.index >= rows.length - 5) {
-      onLoadMore();
-    }
-  }, [virtualizer.getVirtualItems(), hasMore, loadingMore, onLoadMore, rows.length]);
+    if (!hasMore || !onLoadMore) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (loadingMore) return;
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      if (scrollHeight - scrollTop - clientHeight < 800) {
+        onLoadMore();
+      }
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [hasMore, loadingMore, onLoadMore]);
 
   if (photos.length === 0) {
     return (
