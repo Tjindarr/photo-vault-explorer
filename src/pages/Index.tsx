@@ -17,7 +17,6 @@ export default function Index() {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [dateRange, setDateRange] = useState<[Date, Date] | null>(null);
 
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
