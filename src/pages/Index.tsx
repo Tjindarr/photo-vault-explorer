@@ -12,6 +12,7 @@ import { type Photo, type Folder } from '@/lib/mock-data';
 import { fetchPhotos, fetchFolders, isApiAvailable } from '@/lib/api-client';
 
 export default function Index() {
+  const PHOTO_PAGE_SIZE = 10000;
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
@@ -24,6 +25,25 @@ export default function Index() {
   const [loading, setLoading] = useState(true);
   const [usingApi, setUsingApi] = useState(false);
 
+  const loadAllPhotos = useCallback(async () => {
+    const firstPage = await fetchPhotos({ limit: PHOTO_PAGE_SIZE, offset: 0 });
+
+    if (firstPage.total <= firstPage.items.length) {
+      return firstPage.items;
+    }
+
+    const remainingRequests: Promise<{ items: Photo[]; total: number }>[] = [];
+    for (let offset = firstPage.items.length; offset < firstPage.total; offset += PHOTO_PAGE_SIZE) {
+      remainingRequests.push(fetchPhotos({ limit: PHOTO_PAGE_SIZE, offset }));
+    }
+
+    const remainingPages = await Promise.all(remainingRequests);
+    return [
+      ...firstPage.items,
+      ...remainingPages.flatMap((page) => page.items),
+    ];
+  }, [PHOTO_PAGE_SIZE]);
+
   // Load photos and folders
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -32,17 +52,17 @@ export default function Index() {
       setUsingApi(apiReady);
 
       const [photosResult, foldersResult] = await Promise.all([
-        fetchPhotos({ limit: 10000 }),
+        loadAllPhotos(),
         fetchFolders(),
       ]);
-      setAllPhotos(photosResult.items);
+       setAllPhotos(photosResult);
       setFolders(foldersResult);
     } catch (e) {
       console.error('Failed to load data:', e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadAllPhotos]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
