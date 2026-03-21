@@ -144,4 +144,27 @@ export async function fetchIndexStatus(): Promise<{
   return res.json();
 }
 
+export async function fetchDuplicates(): Promise<{
+  groups: { hash: string; photos: Photo[] }[];
+  totalGroups: number;
+  totalDuplicates: number;
+}> {
+  if (!(await isApiAvailable())) {
+    return { groups: [], totalGroups: 0, totalDuplicates: 0 };
+  }
+  const res = await fetch(`${API_BASE}/duplicates`);
+  if (!res.ok) throw new Error('Failed to fetch duplicates');
+  return res.json();
+}
+
+export async function deletePhotos(ids: string[]): Promise<{ deleted: number }> {
+  const res = await fetch(`${API_BASE}/photos/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+  if (!res.ok) throw new Error('Failed to delete photos');
+  return res.json();
+}
+
 export { isApiAvailable };
