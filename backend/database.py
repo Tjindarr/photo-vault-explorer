@@ -75,16 +75,20 @@ def upsert_photo(photo: dict):
 
 
 def remove_missing_photos(existing_paths: set[str]):
-    """Remove DB entries for files that no longer exist on disk."""
+    """Remove DB entries for files that no longer exist on disk. Returns list of removed (path, id, thumbnail_path)."""
     conn = get_db()
-    cursor = conn.execute("SELECT path FROM photos")
-    db_paths = {row["path"] for row in cursor.fetchall()}
-    removed = db_paths - existing_paths
-    if removed:
-        conn.executemany("DELETE FROM photos WHERE path = ?", [(p,) for p in removed])
+    cursor = conn.execute("SELECT path, id, thumbnail_path FROM photos")
+    db_entries = {row["path"]: (row["id"], row["thumbnail_path"]) for row in cursor.fetchall()}
+    removed_paths = set(db_entries.keys()) - existing_paths
+    removed_info = []
+    if removed_paths:
+        for p in removed_paths:
+            photo_id, thumb = db_entries[p]
+            removed_info.append({"path": p, "id": photo_id, "thumbnail_path": thumb})
+        conn.executemany("DELETE FROM photos WHERE path = ?", [(p,) for p in removed_paths])
         conn.commit()
     conn.close()
-    return len(removed)
+    return removed_info
 
 
 def search_photos(
