@@ -7,7 +7,6 @@ import PhotoGrid from '@/components/PhotoGrid';
 import PhotoMap from '@/components/PhotoMap';
 import StatsDashboard from '@/components/StatsDashboard';
 import PhotoViewer from '@/components/PhotoViewer';
-import TimelineSlider from '@/components/TimelineSlider';
 import { type Photo, type Folder } from '@/lib/mock-data';
 import { fetchPhotos, fetchFolders, isApiAvailable } from '@/lib/api-client';
 

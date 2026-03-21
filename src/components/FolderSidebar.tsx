@@ -23,27 +23,34 @@ function FolderNode({ folder, depth, selectedFolder, onSelectFolder }: {
 
   return (
     <div>
-      <button
-        onClick={() => {
-          onSelectFolder(isSelected ? null : folder.path);
-          if (hasChildren) setExpanded(!expanded);
-        }}
+      <div
         className={cn(
-          'flex items-center w-full gap-2 px-3 py-1.5 text-sm rounded-md transition-colors duration-150',
-          'hover:bg-secondary/80 active:scale-[0.98]',
+          'flex items-center w-full gap-1 px-3 py-1.5 text-sm rounded-md transition-colors duration-150',
+          'hover:bg-secondary/80',
           isSelected ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/70',
         )}
         style={{ paddingLeft: `${depth * 16 + 12}px` }}
       >
         {hasChildren ? (
-          <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 transition-transform duration-200', expanded && 'rotate-90')} />
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            className="p-1 -ml-1 rounded hover:bg-secondary active:scale-95 shrink-0"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+          >
+            <ChevronRight className={cn('h-3.5 w-3.5 transition-transform duration-200', expanded && 'rotate-90')} />
+          </button>
         ) : (
-          <span className="w-3.5" />
+          <span className="w-5" />
         )}
-        <FolderIcon className="h-4 w-4 shrink-0 text-accent" />
-        <span className="truncate">{folder.name}</span>
-        <span className="ml-auto text-xs text-muted-foreground tabular-nums">{folder.photoCount}</span>
-      </button>
+        <button
+          onClick={() => onSelectFolder(isSelected ? null : folder.path)}
+          className="flex items-center gap-2 flex-1 min-w-0 py-0.5 active:scale-[0.98]"
+        >
+          <FolderIcon className="h-4 w-4 shrink-0 text-accent" />
+          <span className="truncate">{folder.name}</span>
+          <span className="ml-auto text-xs text-muted-foreground tabular-nums">{folder.photoCount}</span>
+        </button>
+      </div>
       {expanded && hasChildren && (
         <div>
           {folder.children.map((child) => (
