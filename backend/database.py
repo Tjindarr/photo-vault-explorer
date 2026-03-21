@@ -48,6 +48,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_photos_camera ON photos(camera);
         CREATE INDEX IF NOT EXISTS idx_photos_type ON photos(type);
         CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(path);
+        CREATE INDEX IF NOT EXISTS idx_photos_file_hash ON photos(file_hash);
     """)
     conn.commit()
     conn.close()
@@ -288,3 +289,53 @@ def get_map_photos(
 
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_duplicate_photos() -> list[dict]:
+    """Find duplicate photos by file_hash. Returns all photos grouped by hash."""
+    conn = get_db()
+    # Find hashes that appear more than once
+    dup_hashes = conn.execute(
+        "SELECT file_hash FROM photos WHERE file_hash IS NOT NULL GROUP BY file_hash HAVING COUNT(*) > 1"
+    ).fetchall()
+
+    if not dup_hashes:
+        conn.close()
+        return []
+
+    hash_list = [row["file_hash"] for row in dup_hashes]
+    placeholders = ",".join("?" for _ in hash_list)
+    rows = conn.execute(
+        f"SELECT * FROM photos WHERE file_hash IN ({placeholders}) ORDER BY file_hash, date_taken DESC",
+        hash_list,
+    ).fetchall()
+
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def delete_photos_by_ids(photo_ids: list[str]) -> list[dict]:
+    """Delete photos by ID. Returns removed entries with paths for cleanup."""
+    if not photo_ids:
+        return []
+
+    unique_ids = list(dict.fromkeys(photo_ids))
+    placeholders = ",".join("?" for _ in unique_ids)
+
+    conn = get_db()
+    rows = conn.execute(
+        f"SELECT path, id, thumbnail_path FROM photos WHERE id IN ({placeholders})",
+        unique_ids,
+    ).fetchall()
+
+    removed_info = [
+        {"path": row["path"], "id": row["id"], "thumbnail_path": row["thumbnail_path"]}
+        for row in rows
+    ]
+
+    if removed_info:
+        conn.executemany("DELETE FROM photos WHERE id = ?", [(row["id"],) for row in removed_info])
+        conn.commit()
+
+    conn.close()
+    return removed_info
