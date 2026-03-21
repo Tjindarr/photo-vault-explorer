@@ -304,8 +304,11 @@ def generate_video_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
         return None
 
 
-def scan_directory(photos_dir: str = PHOTOS_DIR):
-    """Scan directory recursively and yield photo metadata dicts one at a time."""
+def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
+    """Scan directory recursively. Yields None for skipped files, dict for new/changed."""
+    if known_hashes is None:
+        known_hashes = {}
+
     photos_path = Path(photos_dir)
 
     if not photos_path.exists():
@@ -321,9 +324,6 @@ def scan_directory(photos_dir: str = PHOTOS_DIR):
             continue
 
         rel_path = str(filepath.relative_to(photos_path))
-        folder = str(filepath.parent.relative_to(photos_path))
-        if folder == ".":
-            folder = "Root"
 
         try:
             file_stat = filepath.stat()
@@ -332,19 +332,26 @@ def scan_directory(photos_dir: str = PHOTOS_DIR):
             continue
 
         fhash = file_hash(str(filepath))
+
+        # Skip if already indexed with same hash
+        if rel_path in known_hashes and known_hashes[rel_path] == fhash:
+            yield None
+            continue
+
+        folder = str(filepath.parent.relative_to(photos_path))
+        if folder == ".":
+            folder = "Root"
+
         photo_id = hashlib.md5(rel_path.encode()).hexdigest()[:16]
         is_video = ext in VIDEO_EXTENSIONS
 
-        # Extract EXIF for images
         meta = {}
         if not is_video:
             meta = extract_exif(str(filepath))
 
-        # Fallback date from file modification time
         if not meta.get("date_taken"):
             meta["date_taken"] = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
 
-        # Generate thumbnail
         thumb_path = None
         if is_video:
             thumb_path = generate_video_thumbnail(str(filepath), photo_id)

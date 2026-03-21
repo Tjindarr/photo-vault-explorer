@@ -8,7 +8,7 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos
+from database import init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id, get_stats, remove_missing_photos, get_indexed_hashes
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR
 
 logger = logging.getLogger("snapvault")
@@ -19,17 +19,26 @@ indexing_status = {"running": False, "progress": 0, "total": 0, "last_run": None
 
 
 def run_indexer():
-    """Background indexing task — saves each photo immediately as it's found."""
+    """Background indexing task — skips files already indexed with same hash."""
     indexing_status["running"] = True
     indexing_status["progress"] = 0
     indexing_status["total"] = 0
     logger.info(f"Starting index scan of {PHOTOS_DIR}...")
 
     try:
-        existing_paths = set()
-        count = 0
+        # Load existing indexed hashes to skip unchanged files
+        known_hashes = get_indexed_hashes()
+        logger.info(f"Found {len(known_hashes)} already-indexed files in DB")
 
-        for photo in scan_directory():
+        existing_paths = set(known_hashes.keys())
+        count = 0
+        skipped = 0
+
+        for photo in scan_directory(known_hashes=known_hashes):
+            if photo is None:
+                skipped += 1
+                continue
+
             upsert_photo(photo)
             existing_paths.add(photo["path"])
             count += 1
@@ -37,7 +46,7 @@ def run_indexer():
             indexing_status["total"] = count
 
             if count % 100 == 0:
-                logger.info(f"Indexed {count} files so far...")
+                logger.info(f"Indexed {count} new/changed files ({skipped} skipped)...")
 
         # Clean up removed files
         removed = remove_missing_photos(existing_paths)
@@ -45,7 +54,7 @@ def run_indexer():
             logger.info(f"Removed {removed} entries for deleted files")
 
         indexing_status["last_run"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-        logger.info(f"Indexing complete: {count} files indexed")
+        logger.info(f"Indexing complete: {count} new/changed, {skipped} skipped")
 
     except Exception as e:
         logger.error(f"Indexing failed: {e}")

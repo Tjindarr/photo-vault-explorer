@@ -179,6 +179,14 @@ def get_photo_by_id(photo_id: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
+def get_indexed_hashes() -> dict[str, str]:
+    """Return a dict of {path: file_hash} for all indexed photos."""
+    conn = get_db()
+    rows = conn.execute("SELECT path, file_hash FROM photos").fetchall()
+    conn.close()
+    return {row["path"]: row["file_hash"] for row in rows}
+
+
 def get_stats() -> dict:
     conn = get_db()
     total = conn.execute("SELECT COUNT(*) as cnt FROM photos").fetchone()["cnt"]
