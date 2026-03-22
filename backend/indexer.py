@@ -271,18 +271,22 @@ def generate_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
         sub_dir = os.path.join(THUMB_DIR, photo_id[:2])
         os.makedirs(sub_dir, exist_ok=True)
 
-        thumb_filename = f"{photo_id}.jpg"
+        thumb_filename = f"{photo_id}.webp"
         thumb_path = os.path.join(sub_dir, thumb_filename)
 
+        # Also accept legacy .jpg thumbnails
+        legacy_path = os.path.join(sub_dir, f"{photo_id}.jpg")
         if os.path.exists(thumb_path):
             return f"{photo_id[:2]}/{thumb_filename}"
+        if os.path.exists(legacy_path):
+            return f"{photo_id[:2]}/{photo_id}.jpg"
 
         with Image.open(filepath) as img:
             img = ImageOps.exif_transpose(img)
             img.thumbnail(THUMB_SIZE, Image.LANCZOS)
-            if img.mode not in ("RGB",):
+            if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGB")
-            img.save(thumb_path, "JPEG", quality=82, optimize=True)
+            img.save(thumb_path, "WEBP", quality=80, method=4)
 
         return f"{photo_id[:2]}/{thumb_filename}"
     except Exception as e:
@@ -302,46 +306,55 @@ def compute_phash(filepath: str) -> Optional[str]:
 
 
 def generate_video_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
-    """Generate a thumbnail from a video file using ffmpeg."""
+    """Generate a thumbnail from a video file using ffmpeg (WebP output)."""
     try:
         os.makedirs(THUMB_DIR, exist_ok=True)
 
         sub_dir = os.path.join(THUMB_DIR, photo_id[:2])
         os.makedirs(sub_dir, exist_ok=True)
 
-        thumb_filename = f"{photo_id}.jpg"
+        thumb_filename = f"{photo_id}.webp"
         thumb_path = os.path.join(sub_dir, thumb_filename)
 
+        # Accept legacy .jpg thumbnails
+        legacy_path = os.path.join(sub_dir, f"{photo_id}.jpg")
         if os.path.exists(thumb_path):
             return f"{photo_id[:2]}/{thumb_filename}"
+        if os.path.exists(legacy_path):
+            return f"{photo_id[:2]}/{photo_id}.jpg"
 
-        # Extract frame at 1 second (or first frame if shorter)
+        # Extract frame as PNG first, then convert to WebP via Pillow
+        tmp_frame = os.path.join(sub_dir, f"{photo_id}_tmp.png")
+
         result = subprocess.run(
             [
                 "ffmpeg", "-y", "-i", filepath,
                 "-ss", "1", "-vframes", "1",
                 "-vf", f"scale={THUMB_SIZE[0]}:{THUMB_SIZE[1]}:force_original_aspect_ratio=decrease",
-                "-q:v", "3",
-                thumb_path,
+                tmp_frame,
             ],
             capture_output=True, timeout=30,
         )
 
-        if result.returncode != 0 or not os.path.exists(thumb_path):
-            # Try frame 0 if seeking to 1s failed
+        if result.returncode != 0 or not os.path.exists(tmp_frame):
             subprocess.run(
                 [
                     "ffmpeg", "-y", "-i", filepath,
                     "-vframes", "1",
                     "-vf", f"scale={THUMB_SIZE[0]}:{THUMB_SIZE[1]}:force_original_aspect_ratio=decrease",
-                    "-q:v", "3",
-                    thumb_path,
+                    tmp_frame,
                 ],
                 capture_output=True, timeout=30,
             )
 
-        if os.path.exists(thumb_path):
+        if os.path.exists(tmp_frame):
+            with Image.open(tmp_frame) as img:
+                if img.mode not in ("RGB",):
+                    img = img.convert("RGB")
+                img.save(thumb_path, "WEBP", quality=80, method=4)
+            os.remove(tmp_frame)
             return f"{photo_id[:2]}/{thumb_filename}"
+
         return None
     except Exception as e:
         logger.warning(f"Video thumbnail generation failed for {filepath}: {e}")

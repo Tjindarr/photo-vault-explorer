@@ -313,7 +313,7 @@ def get_map_photos(
     folder: Optional[str] = None,
     limit: int = 20000,
 ) -> list[dict]:
-    """Return geotagged photos pre-clustered by city for performance."""
+    """Return geotagged photos as server-side clusters grouped by city."""
     conn = get_db()
     conditions = ["gps_lat IS NOT NULL", "gps_lng IS NOT NULL"]
     params = []
@@ -345,6 +345,90 @@ def get_map_photos(
         params + [limit],
     ).fetchall()
 
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_map_clusters(
+    query: Optional[str] = None,
+    folder: Optional[str] = None,
+    country: Optional[str] = None,
+    city: Optional[str] = None,
+) -> list[dict]:
+    """Return server-side clustered map data grouped by city (or coordinate grid for uncategorized)."""
+    conn = get_db()
+    conditions = ["gps_lat IS NOT NULL", "gps_lng IS NOT NULL"]
+    params = []
+
+    if query:
+        conditions.append(
+            "(filename LIKE ? OR location LIKE ? OR camera LIKE ? OR folder LIKE ? OR city LIKE ? OR country LIKE ?)"
+        )
+        q = f"%{query}%"
+        params.extend([q, q, q, q, q, q])
+
+    if folder:
+        conditions.append("folder LIKE ?")
+        params.append(f"{folder}%")
+
+    if country:
+        conditions.append("country = ?")
+        params.append(country)
+
+    if city:
+        conditions.append("city = ?")
+        params.append(city)
+
+    where = " AND ".join(conditions)
+
+    # Cluster by city when available, otherwise by coordinate grid (~10km)
+    rows = conn.execute(
+        f"""
+        SELECT
+            COALESCE(city, CAST(ROUND(gps_lat, 1) AS TEXT) || ',' || CAST(ROUND(gps_lng, 1) AS TEXT)) as cluster_key,
+            COALESCE(location, city, country, 'Unknown') as label,
+            country,
+            city,
+            AVG(gps_lat) as lat,
+            AVG(gps_lng) as lng,
+            COUNT(*) as count,
+            MIN(id) as sample_id,
+            MIN(thumbnail_path) as sample_thumb
+        FROM photos
+        WHERE {where}
+        GROUP BY cluster_key
+        ORDER BY count DESC
+        """,
+        params,
+    ).fetchall()
+
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_map_countries() -> list[dict]:
+    """Return list of countries with photo counts for map filtering."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT country as name, COUNT(*) as count FROM photos WHERE country IS NOT NULL AND gps_lat IS NOT NULL GROUP BY country ORDER BY count DESC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_map_cities(country: Optional[str] = None) -> list[dict]:
+    """Return list of cities with photo counts, optionally filtered by country."""
+    conn = get_db()
+    conditions = ["city IS NOT NULL", "gps_lat IS NOT NULL"]
+    params = []
+    if country:
+        conditions.append("country = ?")
+        params.append(country)
+    where = " AND ".join(conditions)
+    rows = conn.execute(
+        f"SELECT city as name, COUNT(*) as count FROM photos WHERE {where} GROUP BY city ORDER BY count DESC",
+        params,
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 

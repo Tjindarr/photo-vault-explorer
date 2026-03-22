@@ -15,7 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import (
     init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id,
     get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths,
-    get_map_photos, get_duplicate_photos, delete_photos_by_ids,
+    get_map_photos, get_map_clusters, get_map_countries, get_map_cities,
+    get_duplicate_photos, delete_photos_by_ids,
     add_to_trash, get_trash_items, get_trash_item_by_id, remove_from_trash, purge_expired_trash,
     get_cleanup_data,
 )
@@ -213,6 +214,43 @@ def list_map_photos(
     return {"items": items, "total": len(items)}
 
 
+@app.get("/api/map-clusters")
+def list_map_clusters(
+    q: str = Query(None),
+    folder: str = Query(None),
+    country: str = Query(None),
+    city: str = Query(None),
+):
+    """Return pre-clustered map data for fast rendering."""
+    clusters = get_map_clusters(query=q, folder=folder, country=country, city=city)
+    return {
+        "clusters": [
+            {
+                "id": c["cluster_key"],
+                "label": c["label"],
+                "country": c["country"],
+                "city": c["city"],
+                "lat": c["lat"],
+                "lng": c["lng"],
+                "count": c["count"],
+                "thumbnailUrl": f"/api/thumbnails/{c['sample_id']}" if c.get("sample_thumb") else None,
+            }
+            for c in clusters
+        ],
+        "total": sum(c["count"] for c in clusters),
+    }
+
+
+@app.get("/api/map-countries")
+def list_map_countries():
+    return get_map_countries()
+
+
+@app.get("/api/map-cities")
+def list_map_cities(country: str = Query(None)):
+    return get_map_cities(country=country)
+
+
 @app.get("/api/photos/{photo_id}")
 def get_photo(photo_id: str):
     photo = get_photo_by_id(photo_id)
@@ -252,7 +290,8 @@ def get_thumbnail(photo_id: str):
             raise HTTPException(status_code=404, detail="Thumbnail file missing")
         thumb_path = os.path.join(THUMB_DIR, regenerated_rel)
 
-    return FileResponse(thumb_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=2592000"})
+    media_type = "image/webp" if thumb_path.endswith(".webp") else "image/jpeg"
+    return FileResponse(thumb_path, media_type=media_type, headers={"Cache-Control": "public, max-age=2592000"})
 
 
 def convert_image_to_jpeg(source: str, photo_id: str) -> Optional[str]:
