@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Smartphone, Film, HardDrive, Images, Trash2, CheckSquare, Square, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
+import { Smartphone, Film, HardDrive, Images, Copy, Trash2, CheckSquare, Square, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fetchCleanup, deletePhotos } from '@/lib/api-client';
 import type { Photo } from '@/lib/mock-data';
@@ -10,6 +10,7 @@ interface CleanupData {
   shortVideos: Photo[];
   largeVideos: Photo[];
   similarGroups: Photo[][];
+  duplicateGroups: Photo[][];
   summary: {
     screenshotCount: number;
     screenshotSize: number;
@@ -19,6 +20,9 @@ interface CleanupData {
     largeVideoSize: number;
     similarGroupCount: number;
     similarPhotoCount: number;
+    duplicateGroupCount: number;
+    duplicatePhotoCount: number;
+    duplicateSize: number;
   };
 }
 
@@ -345,7 +349,8 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
   }
 
   const { summary } = data;
-  const totalSavings = summary.screenshotSize + summary.shortVideoSize + summary.largeVideoSize;
+  const totalSavings = summary.screenshotSize + summary.shortVideoSize + summary.largeVideoSize + summary.duplicateSize;
+  const totalItems = summary.screenshotCount + summary.shortVideoCount + summary.largeVideoCount + summary.similarPhotoCount + summary.duplicatePhotoCount;
 
   return (
     <div className="h-full flex flex-col">
@@ -356,7 +361,7 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
           <div>
             <h2 className="text-sm font-semibold text-foreground">Smart Cleanup</h2>
             <p className="text-xs text-muted-foreground">
-              Found {summary.screenshotCount + summary.shortVideoCount + summary.largeVideoCount + summary.similarPhotoCount} items · up to {formatSize(totalSavings)} reclaimable
+              Found {totalItems} items · up to {formatSize(totalSavings)} reclaimable
             </p>
           </div>
         </div>
