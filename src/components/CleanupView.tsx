@@ -159,7 +159,8 @@ function getGroupKey(group: Photo[]): string {
 
 function SimilarGroupsSection({ groups, selected, onToggleSelect, onAutoSelect, onClearAll, onView, summary, ignoredGroups, onIgnoreGroup, onResetIgnored }: SimilarGroupsSectionProps) {
   const [expanded, setExpanded] = useState(false);
-  const visibleGroups = useMemo(() => groups.filter(g => !ignoredGroups.has(getGroupKey(g))), [groups, ignoredGroups]);
+  const [minGroupSize, setMinGroupSize] = useState(2);
+  const visibleGroups = useMemo(() => groups.filter(g => !ignoredGroups.has(getGroupKey(g)) && g.length >= minGroupSize), [groups, ignoredGroups, minGroupSize]);
   const selectedCount = visibleGroups.flat().filter(p => selected.has(p.id)).length;
   const totalSize = visibleGroups.flat().reduce((acc, p) => acc + p.fileSize, 0);
 
@@ -192,7 +193,7 @@ function SimilarGroupsSection({ groups, selected, onToggleSelect, onAutoSelect, 
 
       {expanded && (
         <div className="border-t border-border">
-          <div className="flex items-center gap-2 px-3 py-2 bg-muted/30">
+          <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 flex-wrap">
             <button
               onClick={onAutoSelect}
               className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary transition-colors"
@@ -207,10 +208,21 @@ function SimilarGroupsSection({ groups, selected, onToggleSelect, onAutoSelect, 
                 <Square className="h-3 w-3" /> Clear
               </button>
             )}
+            <div className="inline-flex items-center gap-1.5 ml-auto">
+              <label className="text-xs text-muted-foreground whitespace-nowrap">Min group size</label>
+              <input
+                type="number"
+                min={2}
+                max={99}
+                value={minGroupSize}
+                onChange={(e) => setMinGroupSize(Math.max(2, parseInt(e.target.value) || 2))}
+                className="w-12 h-6 text-xs text-center rounded border border-input bg-background text-foreground"
+              />
+            </div>
             {ignoredGroups.size > 0 && (
               <button
                 onClick={onResetIgnored}
-                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors ml-auto"
+                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Eye className="h-3 w-3" /> Show {ignoredGroups.size} ignored
               </button>
