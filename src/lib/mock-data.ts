@@ -77,6 +77,7 @@ export const mockPhotos: Photo[] = Array.from({ length: 2000 }, (_, i) => {
     thumbnailUrl: `https://picsum.photos/seed/${i + 10}/${w * 100}/${h * 100}`,
     fullUrl: `https://picsum.photos/seed/${i + 10}/${w * 400}/${h * 400}`,
     fileSize: Math.floor(r * 15000000) + 500000,
+    duration: isVideo ? Math.max(1, Math.floor(seededRandom(i + 300) * 180)) : undefined,
     metadata: {
       dateTaken: `${year}-${month}-${day}T${String(Math.floor(r * 24)).padStart(2, '0')}:${String(Math.floor(r2 * 60)).padStart(2, '0')}:00`,
       location: locations[Math.floor(r3 * locations.length)],
