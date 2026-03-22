@@ -697,6 +697,8 @@ def cleanup_suggestions():
         ),
     }
 
+    _cleanup_cache["data"] = result
+    _cleanup_cache["ts"] = now
     return result
 
 
