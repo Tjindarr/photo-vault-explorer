@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Photo } from '@/lib/mock-data';
@@ -17,36 +18,13 @@ interface PhotoMapProps {
   onSelect: (photo: Photo) => void;
 }
 
-interface ClusterGroup {
-  lat: number;
-  lng: number;
-  location: string;
-  photos: Photo[];
-}
-
 export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
-  const clusters = useMemo(() => {
-    const map = new Map<string, ClusterGroup>();
-    for (const photo of photos) {
-      const { gpsLat, gpsLng, location } = photo.metadata;
-      if (gpsLat == null || gpsLng == null) continue;
+  const geoPhotos = useMemo(
+    () => photos.filter((p) => p.metadata.gpsLat != null && p.metadata.gpsLng != null),
+    [photos]
+  );
 
-      const clusterLabel = location?.trim() || `${gpsLat.toFixed(5)}, ${gpsLng.toFixed(5)}`;
-      const clusterKey = location?.trim()
-        ? `location:${location.trim()}`
-        : `coords:${gpsLat.toFixed(5)},${gpsLng.toFixed(5)}`;
-
-      if (!map.has(clusterKey)) {
-        map.set(clusterKey, { lat: gpsLat, lng: gpsLng, location: clusterLabel, photos: [] });
-      }
-      map.get(clusterKey)!.photos.push(photo);
-    }
-    return Array.from(map.values());
-  }, [photos]);
-
-  const geoPhotos = clusters.reduce((n, c) => n + c.photos.length, 0);
-
-  if (clusters.length === 0) {
+  if (geoPhotos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center fade-in">
         <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
@@ -65,7 +43,7 @@ export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
     <div className="h-full flex flex-col fade-in">
       <div className="flex items-center gap-2 px-1 py-2">
         <span className="text-xs text-muted-foreground">
-          {geoPhotos} geotagged photos across {clusters.length} locations
+          {geoPhotos.length} geotagged photos
         </span>
       </div>
       <div className="flex-1 rounded-lg overflow-hidden border border-border relative">
@@ -81,36 +59,42 @@ export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           />
-          {clusters.map((cluster) => (
-            <Marker key={`${cluster.location}-${cluster.lat}-${cluster.lng}`} position={[cluster.lat, cluster.lng]}>
-              <Popup maxWidth={280} minWidth={200}>
-                <div className="font-sans">
-                  <p className="font-semibold text-sm mb-1" style={{ margin: 0 }}>{cluster.location}</p>
-                  <p className="text-xs text-muted-foreground mb-2" style={{ margin: '0 0 8px 0' }}>{cluster.photos.length} photos</p>
-                  <div className="grid grid-cols-3 gap-1">
-                    {cluster.photos.slice(0, 6).map((photo) => (
-                      <button
-                        key={photo.id}
-                        onClick={() => onSelect(photo)}
-                        className="block overflow-hidden rounded active:scale-95 transition-transform"
-                      >
-                        <img
-                          src={photo.thumbnailUrl}
-                          alt={photo.filename}
-                          className="w-full aspect-square object-cover hover:brightness-110 transition-all"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                  {cluster.photos.length > 6 && (
-                    <p className="text-xs text-muted-foreground mt-1 text-center" style={{ margin: '6px 0 0 0' }}>
-                      +{cluster.photos.length - 6} more
+          <MarkerClusterGroup
+            chunkedLoading
+            maxClusterRadius={60}
+            spiderfyOnMaxZoom
+            showCoverageOnHover={false}
+          >
+            {geoPhotos.map((photo) => (
+              <Marker
+                key={photo.id}
+                position={[photo.metadata.gpsLat!, photo.metadata.gpsLng!]}
+              >
+                <Popup maxWidth={260} minWidth={180}>
+                  <div className="font-sans">
+                    {photo.metadata.location && (
+                      <p className="font-semibold text-sm" style={{ margin: '0 0 4px 0' }}>
+                        {photo.metadata.location}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => onSelect(photo)}
+                      className="block overflow-hidden rounded active:scale-95 transition-transform"
+                    >
+                      <img
+                        src={photo.thumbnailUrl}
+                        alt={photo.filename}
+                        className="w-full aspect-video object-cover hover:brightness-110 transition-all rounded"
+                      />
+                    </button>
+                    <p className="text-xs text-muted-foreground" style={{ margin: '4px 0 0 0' }}>
+                      {photo.filename}
                     </p>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+          </MarkerClusterGroup>
         </MapContainer>
       </div>
     </div>
