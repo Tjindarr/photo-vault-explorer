@@ -285,6 +285,28 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
   const [deleting, setDeleting] = useState(false);
   const [dupExpanded, setDupExpanded] = useState(false);
 
+  const IGNORED_KEY = 'imgvault-ignored-similar-groups';
+  const [ignoredGroups, setIgnoredGroups] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(IGNORED_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const ignoreGroup = (key: string) => {
+    setIgnoredGroups(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      localStorage.setItem(IGNORED_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const resetIgnored = () => {
+    setIgnoredGroups(new Set());
+    localStorage.removeItem(IGNORED_KEY);
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
