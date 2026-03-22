@@ -504,6 +504,7 @@ def delete_photos_endpoint(req: DeletePhotosRequest):
             "width": entry["width"],
             "height": entry["height"],
             "file_size": entry["file_size"],
+            "duration": entry.get("duration"),
             "date_taken": entry.get("date_taken"),
             "location": entry.get("location"),
             "camera": entry.get("camera"),
