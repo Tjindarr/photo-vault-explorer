@@ -103,7 +103,11 @@ function PhotoThumbnail({ photo, onSelect, deleteMode, selected, onToggleSelect 
       {photo.type === 'video' && (
         <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-overlay/70 backdrop-blur-sm">
           <Play className="h-3 w-3 text-white fill-white" />
-          <span className="text-[10px] text-white font-medium">Video</span>
+          <span className="text-[10px] text-white font-medium">
+            {photo.duration != null
+              ? `${Math.floor(photo.duration / 60)}:${Math.floor(photo.duration % 60).toString().padStart(2, '0')}`
+              : 'Video'}
+          </span>
         </div>
       )}
 
