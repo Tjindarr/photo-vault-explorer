@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Smartphone, Film, HardDrive, Images, Copy, Trash2, CheckSquare, Square, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Smartphone, Film, HardDrive, Images, Copy, Trash2, CheckSquare, Square, Loader2, Sparkles, ChevronDown, ChevronRight, EyeOff, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fetchCleanup, deletePhotos } from '@/lib/api-client';
 import type { Photo } from '@/lib/mock-data';
