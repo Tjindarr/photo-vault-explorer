@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Smartphone, Film, HardDrive, Images, Copy, Trash2, CheckSquare, Square, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Smartphone, Film, HardDrive, Images, Copy, Trash2, CheckSquare, Square, Loader2, Sparkles, ChevronDown, ChevronRight, EyeOff, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fetchCleanup, deletePhotos } from '@/lib/api-client';
 import type { Photo } from '@/lib/mock-data';
@@ -148,12 +148,20 @@ interface SimilarGroupsSectionProps {
   onClearAll: () => void;
   onView: (photo: Photo) => void;
   summary: { similarGroupCount: number; similarPhotoCount: number };
+  ignoredGroups: Set<string>;
+  onIgnoreGroup: (key: string) => void;
+  onResetIgnored: () => void;
 }
 
-function SimilarGroupsSection({ groups, selected, onToggleSelect, onAutoSelect, onClearAll, onView, summary }: SimilarGroupsSectionProps) {
+function getGroupKey(group: Photo[]): string {
+  return group.map(p => p.id).sort().join(',');
+}
+
+function SimilarGroupsSection({ groups, selected, onToggleSelect, onAutoSelect, onClearAll, onView, summary, ignoredGroups, onIgnoreGroup, onResetIgnored }: SimilarGroupsSectionProps) {
   const [expanded, setExpanded] = useState(false);
-  const selectedCount = groups.flat().filter(p => selected.has(p.id)).length;
-  const totalSize = groups.flat().reduce((acc, p) => acc + p.fileSize, 0);
+  const visibleGroups = useMemo(() => groups.filter(g => !ignoredGroups.has(getGroupKey(g))), [groups, ignoredGroups]);
+  const selectedCount = visibleGroups.flat().filter(p => selected.has(p.id)).length;
+  const totalSize = visibleGroups.flat().reduce((acc, p) => acc + p.fileSize, 0);
 
   if (groups.length === 0) return null;
 
@@ -172,7 +180,8 @@ function SimilarGroupsSection({ groups, selected, onToggleSelect, onAutoSelect, 
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary">AI</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {summary.similarGroupCount} group{summary.similarGroupCount !== 1 ? 's' : ''} · {summary.similarPhotoCount} photos · {formatSize(totalSize)}
+            {visibleGroups.length} group{visibleGroups.length !== 1 ? 's' : ''} · {visibleGroups.flat().length} photos · {formatSize(totalSize)}
+            {ignoredGroups.size > 0 && ` · ${ignoredGroups.size} ignored`}
           </p>
         </div>
         {selectedCount > 0 && (
@@ -198,46 +207,70 @@ function SimilarGroupsSection({ groups, selected, onToggleSelect, onAutoSelect, 
                 <Square className="h-3 w-3" /> Clear
               </button>
             )}
+            {ignoredGroups.size > 0 && (
+              <button
+                onClick={onResetIgnored}
+                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors ml-auto"
+              >
+                <Eye className="h-3 w-3" /> Show {ignoredGroups.size} ignored
+              </button>
+            )}
           </div>
           <div className="space-y-3 p-2">
-            {groups.map((group, gi) => (
-              <div key={gi} className="rounded-md border border-border/60 p-2">
-                <p className="text-[10px] text-muted-foreground mb-1.5">
-                  {group.length} photos taken within seconds · {group[0]?.createdAt?.slice(0, 10)}
-                </p>
-                <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
-                  {group.map((photo, idx) => {
-                    const isSelected = selected.has(photo.id);
-                    const isKeep = idx === 0;
-                    return (
-                      <div
-                        key={photo.id}
-                        className={cn(
-                          'relative rounded-md overflow-hidden border-2 transition-all cursor-pointer group shrink-0 w-20 sm:w-24',
-                          isSelected ? 'border-destructive ring-1 ring-destructive/30' : isKeep ? 'border-primary/40' : 'border-transparent hover:border-muted-foreground/30'
-                        )}
+            {visibleGroups.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">All similar groups have been ignored</p>
+            ) : (
+              visibleGroups.map((group, gi) => {
+                const groupKey = getGroupKey(group);
+                return (
+                  <div key={gi} className="rounded-md border border-border/60 p-2">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[10px] text-muted-foreground">
+                        {group.length} photos taken within seconds · {group[0]?.createdAt?.slice(0, 10)}
+                      </p>
+                      <button
+                        onClick={() => onIgnoreGroup(groupKey)}
+                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors shrink-0 ml-2"
+                        title="Ignore this group"
                       >
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onToggleSelect(photo.id); }}
-                          className={cn(
-                            'absolute top-1 left-1 z-10 w-4 h-4 rounded flex items-center justify-center transition-all',
-                            isSelected ? 'bg-destructive text-destructive-foreground' : 'bg-black/50 text-white/70 opacity-0 group-hover:opacity-100'
-                          )}
-                        >
-                          {isSelected ? <CheckSquare className="h-2.5 w-2.5" /> : <Square className="h-2.5 w-2.5" />}
-                        </button>
-                        {isKeep && (
-                          <span className="absolute top-1 right-1 z-10 bg-primary text-primary-foreground text-[8px] font-semibold px-1 py-0.5 rounded">KEEP</span>
-                        )}
-                        <div className="aspect-square" onClick={() => onView(photo)}>
-                          <img src={photo.thumbnailUrl || photo.fullUrl} alt={photo.filename} className="w-full h-full object-cover" loading="lazy" draggable={false} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+                        <EyeOff className="h-3 w-3" /> Ignore
+                      </button>
+                    </div>
+                    <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
+                      {group.map((photo, idx) => {
+                        const isSelected = selected.has(photo.id);
+                        const isKeep = idx === 0;
+                        return (
+                          <div
+                            key={photo.id}
+                            className={cn(
+                              'relative rounded-md overflow-hidden border-2 transition-all cursor-pointer group shrink-0 w-20 sm:w-24',
+                              isSelected ? 'border-destructive ring-1 ring-destructive/30' : isKeep ? 'border-primary/40' : 'border-transparent hover:border-muted-foreground/30'
+                            )}
+                          >
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onToggleSelect(photo.id); }}
+                              className={cn(
+                                'absolute top-1 left-1 z-10 w-4 h-4 rounded flex items-center justify-center transition-all',
+                                isSelected ? 'bg-destructive text-destructive-foreground' : 'bg-black/50 text-white/70 opacity-0 group-hover:opacity-100'
+                              )}
+                            >
+                              {isSelected ? <CheckSquare className="h-2.5 w-2.5" /> : <Square className="h-2.5 w-2.5" />}
+                            </button>
+                            {isKeep && (
+                              <span className="absolute top-1 right-1 z-10 bg-primary text-primary-foreground text-[8px] font-semibold px-1 py-0.5 rounded">KEEP</span>
+                            )}
+                            <div className="aspect-square" onClick={() => onView(photo)}>
+                              <img src={photo.thumbnailUrl || photo.fullUrl} alt={photo.filename} className="w-full h-full object-cover" loading="lazy" draggable={false} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -251,6 +284,28 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [dupExpanded, setDupExpanded] = useState(false);
+
+  const IGNORED_KEY = 'imgvault-ignored-similar-groups';
+  const [ignoredGroups, setIgnoredGroups] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(IGNORED_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const ignoreGroup = (key: string) => {
+    setIgnoredGroups(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      localStorage.setItem(IGNORED_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const resetIgnored = () => {
+    setIgnoredGroups(new Set());
+    localStorage.removeItem(IGNORED_KEY);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -453,6 +508,9 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
           onClearAll={clearSimilar}
           onView={onSelect}
           summary={summary}
+          ignoredGroups={ignoredGroups}
+          onIgnoreGroup={ignoreGroup}
+          onResetIgnored={resetIgnored}
         />
 
         {/* Exact Duplicates */}
