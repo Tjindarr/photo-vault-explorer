@@ -579,6 +579,7 @@ def restore_from_trash(req: RestoreRequest):
                     "width": item["width"],
                     "height": item["height"],
                     "file_size": item["file_size"],
+                    "duration": item.get("duration"),
                     "date_taken": item.get("date_taken"),
                     "location": item.get("location"),
                     "camera": item.get("camera"),
