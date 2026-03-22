@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 import exifread
+import imagehash
 from PIL import Image, ExifTags, ImageOps
 from pillow_heif import register_heif_opener
 
@@ -287,6 +288,17 @@ def generate_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
         return None
 
 
+def compute_phash(filepath: str) -> Optional[str]:
+    """Compute perceptual hash for an image file."""
+    try:
+        with Image.open(filepath) as img:
+            h = imagehash.phash(img)
+            return str(h)
+    except Exception as e:
+        logger.warning(f"pHash computation failed for {filepath}: {e}")
+        return None
+
+
 def generate_video_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
     """Generate a thumbnail from a video file using ffmpeg."""
     try:
@@ -407,11 +419,13 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
 
         thumb_path = None
         duration = None
+        phash = None
         if is_video:
             thumb_path = generate_video_thumbnail(str(filepath), photo_id)
             duration = get_video_duration(str(filepath))
         else:
             thumb_path = generate_thumbnail(str(filepath), photo_id)
+            phash = compute_phash(str(filepath))
 
         yield {
             "id": photo_id,
@@ -434,5 +448,6 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
             "gps_lng": meta.get("gps_lng"),
             "thumbnail_path": thumb_path,
             "file_hash": fhash,
+            "phash": phash,
             "file_modified_at": datetime.fromtimestamp(file_stat.st_mtime).isoformat(),
         }

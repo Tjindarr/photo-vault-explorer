@@ -7,3 +7,4 @@ exifread==3.0.0
 watchdog==4.0.0
 aiosqlite==0.20.0
 python-multipart==0.0.9
+imagehash==4.3.1
