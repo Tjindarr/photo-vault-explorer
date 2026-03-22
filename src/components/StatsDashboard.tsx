@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { MapPin, Camera, Calendar, Film, Image } from 'lucide-react';
+import { MapPin, Camera, Calendar, Film, Image, Globe, Building2 } from 'lucide-react';
 
 interface StatsData {
   total: number;
@@ -13,6 +14,8 @@ interface StatsData {
   byCamera: { name: string; count: number }[];
   byLocation: { name: string; count: number }[];
   byYear: { name: string; count: number }[];
+  byCountry?: { name: string; count: number }[];
+  byCity?: { name: string; count: number }[];
 }
 
 interface StatsDashboardProps {
@@ -68,6 +71,8 @@ function formatSize(bytes: number): string {
 }
 
 export default function StatsDashboard({ stats }: StatsDashboardProps) {
+  const [locationView, setLocationView] = useState<'country' | 'city' | 'location'>('country');
+
   if (!stats) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -96,6 +101,18 @@ export default function StatsDashboard({ stats }: StatsDashboardProps) {
     { name: 'Video', count: stats.videos },
   ].filter(t => t.count > 0);
 
+  const locationData = locationView === 'country'
+    ? (stats.byCountry || [])
+    : locationView === 'city'
+    ? (stats.byCity || [])
+    : stats.byLocation;
+
+  const locationTitle = locationView === 'country'
+    ? 'Photos by Country'
+    : locationView === 'city'
+    ? 'Photos by City'
+    : 'Photos by Location';
+
   return (
     <div className="space-y-5 fade-in-up">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -119,12 +136,27 @@ export default function StatsDashboard({ stats }: StatsDashboardProps) {
           </div>
         </ChartCard>
 
-        <ChartCard title="Photos by Location">
+        <ChartCard title={locationTitle}>
+          <div className="flex gap-1 mb-3">
+            {(['country', 'city', 'location'] as const).map((view) => (
+              <button
+                key={view}
+                onClick={() => setLocationView(view)}
+                className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                  locationView === view
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {view === 'country' ? 'Country' : view === 'city' ? 'City' : 'Location'}
+              </button>
+            ))}
+          </div>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.byLocation.slice(0, 10)} layout="vertical" margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <BarChart data={locationData.slice(0, 10)} layout="vertical" margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.5)' }} />
                 <Bar dataKey="count" fill="hsl(36, 90%, 54%)" radius={[0, 4, 4, 0]} />
               </BarChart>
