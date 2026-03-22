@@ -159,7 +159,8 @@ function getGroupKey(group: Photo[]): string {
 
 function SimilarGroupsSection({ groups, selected, onToggleSelect, onAutoSelect, onClearAll, onView, summary, ignoredGroups, onIgnoreGroup, onResetIgnored }: SimilarGroupsSectionProps) {
   const [expanded, setExpanded] = useState(false);
-  const visibleGroups = useMemo(() => groups.filter(g => !ignoredGroups.has(getGroupKey(g))), [groups, ignoredGroups]);
+  const [minGroupSize, setMinGroupSize] = useState(2);
+  const visibleGroups = useMemo(() => groups.filter(g => !ignoredGroups.has(getGroupKey(g)) && g.length >= minGroupSize), [groups, ignoredGroups, minGroupSize]);
   const selectedCount = visibleGroups.flat().filter(p => selected.has(p.id)).length;
   const totalSize = visibleGroups.flat().reduce((acc, p) => acc + p.fileSize, 0);
 
