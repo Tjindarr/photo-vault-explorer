@@ -403,6 +403,7 @@ def _format_photo(p: dict) -> dict:
         "fullUrl": f"/api/media/{p['id']}",
         "fileSize": p["file_size"],
         "fileHash": p.get("file_hash"),
+        "duration": p.get("duration"),
         "metadata": {
             "dateTaken": p["date_taken"],
             "location": p["location"],
