@@ -417,6 +417,8 @@ def _format_photo(p: dict) -> dict:
             "shutterSpeed": p["shutter_speed"],
             "gpsLat": p["gps_lat"],
             "gpsLng": p["gps_lng"],
+            "country": p.get("country"),
+            "city": p.get("city"),
         },
         "createdAt": p["date_taken"] or p["file_modified_at"],
     }
