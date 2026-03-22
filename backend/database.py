@@ -81,7 +81,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_trash_deleted_at ON trash(deleted_at);
     """)
     # Add columns if missing (migration for existing DBs)
-    for col, col_type in [("duration", "REAL"), ("phash", "TEXT")]:
+    for col, col_type in [("duration", "REAL"), ("phash", "TEXT"), ("country", "TEXT"), ("city", "TEXT")]:
         try:
             conn.execute(f"ALTER TABLE photos ADD COLUMN {col} {col_type}")
         except Exception:
@@ -91,6 +91,8 @@ def init_db():
     except Exception:
         pass
     conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_phash ON photos(phash)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_country ON photos(country)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_city ON photos(city)")
     conn.commit()
     conn.close()
 
@@ -100,16 +102,19 @@ def upsert_photo(photo: dict):
     conn.execute("""
         INSERT INTO photos (id, filename, path, folder, type, width, height,
             file_size, duration, date_taken, location, camera, lens, iso, aperture,
-            shutter_speed, gps_lat, gps_lng, thumbnail_path, file_hash, phash, file_modified_at)
+            shutter_speed, gps_lat, gps_lng, thumbnail_path, file_hash, phash,
+            country, city, file_modified_at)
         VALUES (:id, :filename, :path, :folder, :type, :width, :height,
             :file_size, :duration, :date_taken, :location, :camera, :lens, :iso, :aperture,
-            :shutter_speed, :gps_lat, :gps_lng, :thumbnail_path, :file_hash, :phash, :file_modified_at)
+            :shutter_speed, :gps_lat, :gps_lng, :thumbnail_path, :file_hash, :phash,
+            :country, :city, :file_modified_at)
         ON CONFLICT(path) DO UPDATE SET
             filename=:filename, folder=:folder, type=:type, width=:width, height=:height,
             file_size=:file_size, duration=:duration, date_taken=:date_taken, location=:location, camera=:camera,
             lens=:lens, iso=:iso, aperture=:aperture, shutter_speed=:shutter_speed,
             gps_lat=:gps_lat, gps_lng=:gps_lng, thumbnail_path=:thumbnail_path,
-            file_hash=:file_hash, phash=:phash, file_modified_at=:file_modified_at,
+            file_hash=:file_hash, phash=:phash, country=:country, city=:city,
+            file_modified_at=:file_modified_at,
             indexed_at=datetime('now')
     """, photo)
     conn.commit()
@@ -298,16 +303,17 @@ def get_map_photos(
     folder: Optional[str] = None,
     limit: int = 20000,
 ) -> list[dict]:
+    """Return geotagged photos pre-clustered by city for performance."""
     conn = get_db()
     conditions = ["gps_lat IS NOT NULL", "gps_lng IS NOT NULL"]
     params = []
 
     if query:
         conditions.append(
-            "(filename LIKE ? OR location LIKE ? OR camera LIKE ? OR folder LIKE ?)"
+            "(filename LIKE ? OR location LIKE ? OR camera LIKE ? OR folder LIKE ? OR city LIKE ? OR country LIKE ?)"
         )
         q = f"%{query}%"
-        params.extend([q, q, q, q])
+        params.extend([q, q, q, q, q, q])
 
     if folder:
         conditions.append("folder LIKE ?")
@@ -319,7 +325,8 @@ def get_map_photos(
         f"""
         SELECT id, filename, path, folder, type, width, height, file_size,
                date_taken, location, camera, lens, iso, aperture,
-               shutter_speed, gps_lat, gps_lng, thumbnail_path, file_modified_at
+               shutter_speed, gps_lat, gps_lng, thumbnail_path, file_modified_at,
+               country, city
         FROM photos
         WHERE {where}
         ORDER BY date_taken DESC
