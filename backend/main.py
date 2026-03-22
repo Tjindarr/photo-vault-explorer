@@ -252,7 +252,8 @@ def get_thumbnail(photo_id: str):
             raise HTTPException(status_code=404, detail="Thumbnail file missing")
         thumb_path = os.path.join(THUMB_DIR, regenerated_rel)
 
-    return FileResponse(thumb_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=2592000"})
+    media_type = "image/webp" if thumb_path.endswith(".webp") else "image/jpeg"
+    return FileResponse(thumb_path, media_type=media_type, headers={"Cache-Control": "public, max-age=2592000"})
 
 
 def convert_image_to_jpeg(source: str, photo_id: str) -> Optional[str]:
