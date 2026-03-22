@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Smartphone, Film, HardDrive, Images, Trash2, CheckSquare, Square, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
+import { Smartphone, Film, HardDrive, Images, Copy, Trash2, CheckSquare, Square, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fetchCleanup, deletePhotos } from '@/lib/api-client';
 import type { Photo } from '@/lib/mock-data';
@@ -10,6 +10,7 @@ interface CleanupData {
   shortVideos: Photo[];
   largeVideos: Photo[];
   similarGroups: Photo[][];
+  duplicateGroups: Photo[][];
   summary: {
     screenshotCount: number;
     screenshotSize: number;
@@ -19,6 +20,9 @@ interface CleanupData {
     largeVideoSize: number;
     similarGroupCount: number;
     similarPhotoCount: number;
+    duplicateGroupCount: number;
+    duplicatePhotoCount: number;
+    duplicateSize: number;
   };
 }
 
@@ -246,6 +250,7 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [dupExpanded, setDupExpanded] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -309,6 +314,29 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
     });
   };
 
+  const autoSelectDuplicates = () => {
+    if (!data) return;
+    setSelected(prev => {
+      const next = new Set(prev);
+      for (const group of data.duplicateGroups) {
+        for (let i = 1; i < group.length; i++) {
+          next.add(group[i].id);
+        }
+      }
+      return next;
+    });
+  };
+
+  const clearDuplicates = () => {
+    if (!data) return;
+    const allDupIds = data.duplicateGroups.flat().map(p => p.id);
+    setSelected(prev => {
+      const next = new Set(prev);
+      allDupIds.forEach(id => next.delete(id));
+      return next;
+    });
+  };
+
   const handleDeleteSelected = async () => {
     if (selected.size === 0 || deleting) return;
     if (!confirm(`Delete ${selected.size} file(s)? They will be moved to trash.`)) return;
@@ -345,7 +373,8 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
   }
 
   const { summary } = data;
-  const totalSavings = summary.screenshotSize + summary.shortVideoSize + summary.largeVideoSize;
+  const totalSavings = summary.screenshotSize + summary.shortVideoSize + summary.largeVideoSize + summary.duplicateSize;
+  const totalItems = summary.screenshotCount + summary.shortVideoCount + summary.largeVideoCount + summary.similarPhotoCount + summary.duplicatePhotoCount;
 
   return (
     <div className="h-full flex flex-col">
@@ -356,7 +385,7 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
           <div>
             <h2 className="text-sm font-semibold text-foreground">Smart Cleanup</h2>
             <p className="text-xs text-muted-foreground">
-              Found {summary.screenshotCount + summary.shortVideoCount + summary.largeVideoCount + summary.similarPhotoCount} items · up to {formatSize(totalSavings)} reclaimable
+              Found {totalItems} items · up to {formatSize(totalSavings)} reclaimable
             </p>
           </div>
         </div>
@@ -426,7 +455,101 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
           summary={summary}
         />
 
-        {summary.screenshotCount === 0 && summary.shortVideoCount === 0 && summary.largeVideoCount === 0 && summary.similarGroupCount === 0 && (
+        {/* Exact Duplicates */}
+        {data.duplicateGroups.length > 0 && (
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <button
+              onClick={() => setDupExpanded(!dupExpanded)}
+              className="w-full flex items-center gap-3 p-3 hover:bg-secondary/50 transition-colors"
+            >
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Copy className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">Exact Duplicates</span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary">All folders</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {summary.duplicateGroupCount} group{summary.duplicateGroupCount !== 1 ? 's' : ''} · {summary.duplicatePhotoCount} files · {formatSize(summary.duplicateSize)} wasted
+                </p>
+              </div>
+              {data.duplicateGroups.flat().filter(p => selected.has(p.id)).length > 0 && (
+                <span className="text-xs font-medium text-destructive">
+                  {data.duplicateGroups.flat().filter(p => selected.has(p.id)).length} selected
+                </span>
+              )}
+              {dupExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            </button>
+
+            {dupExpanded && (
+              <div className="border-t border-border">
+                <div className="flex items-center gap-2 px-3 py-2 bg-muted/30">
+                  <button
+                    onClick={autoSelectDuplicates}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary transition-colors"
+                  >
+                    <CheckSquare className="h-3 w-3" /> Auto-select duplicates
+                  </button>
+                  {data.duplicateGroups.flat().filter(p => selected.has(p.id)).length > 0 && (
+                    <button
+                      onClick={clearDuplicates}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Square className="h-3 w-3" /> Clear
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-3 p-2">
+                  {data.duplicateGroups.map((group, gi) => (
+                    <div key={gi} className="rounded-md border border-border/60 p-2">
+                      <p className="text-[10px] text-muted-foreground mb-1.5">
+                        {group.length} copies · {formatSize(group[0]?.fileSize || 0)} each
+                      </p>
+                      <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
+                        {group.map((photo, idx) => {
+                          const isSelected = selected.has(photo.id);
+                          const isKeep = idx === 0;
+                          return (
+                            <div
+                              key={photo.id}
+                              className={cn(
+                                'relative rounded-md overflow-hidden border-2 transition-all cursor-pointer group shrink-0 w-24 sm:w-28',
+                                isSelected ? 'border-destructive ring-1 ring-destructive/30' : isKeep ? 'border-primary/40' : 'border-transparent hover:border-muted-foreground/30'
+                              )}
+                            >
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleSelect(photo.id); }}
+                                className={cn(
+                                  'absolute top-1 left-1 z-10 w-4 h-4 rounded flex items-center justify-center transition-all',
+                                  isSelected ? 'bg-destructive text-destructive-foreground' : 'bg-black/50 text-white/70 opacity-0 group-hover:opacity-100'
+                                )}
+                              >
+                                {isSelected ? <CheckSquare className="h-2.5 w-2.5" /> : <Square className="h-2.5 w-2.5" />}
+                              </button>
+                              {isKeep && (
+                                <span className="absolute top-1 right-1 z-10 bg-primary text-primary-foreground text-[8px] font-semibold px-1 py-0.5 rounded">KEEP</span>
+                              )}
+                              <div className="aspect-square" onClick={() => onSelect(photo)}>
+                                <img src={photo.thumbnailUrl || photo.fullUrl} alt={photo.filename} className="w-full h-full object-cover" loading="lazy" draggable={false} />
+                              </div>
+                              <div className="p-1 bg-card">
+                                <p className="text-[9px] text-foreground truncate">{photo.filename}</p>
+                                <p className="text-[8px] text-muted-foreground truncate">{photo.folder}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {summary.screenshotCount === 0 && summary.shortVideoCount === 0 && summary.largeVideoCount === 0 && summary.similarGroupCount === 0 && summary.duplicateGroupCount === 0 && (
           <div className="flex items-center justify-center h-40">
             <div className="text-center">
               <Sparkles className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />

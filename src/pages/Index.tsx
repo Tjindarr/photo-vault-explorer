@@ -7,7 +7,7 @@ import SearchBar from '@/components/SearchBar';
 import PhotoGrid from '@/components/PhotoGrid';
 import PhotoMap from '@/components/PhotoMap';
 import StatsDashboard from '@/components/StatsDashboard';
-import DuplicatesView from '@/components/DuplicatesView';
+
 import CleanupView from '@/components/CleanupView';
 import TrashView from '@/components/TrashView';
 import PhotoViewer from '@/components/PhotoViewer';
@@ -195,7 +195,7 @@ export default function Index() {
           <div className={cn(
             "flex-1 min-h-0 px-3 sm:px-5",
             viewMode !== 'grid' && "overflow-y-auto scrollbar-thin pb-6",
-            (viewMode === 'duplicates' || viewMode === 'trash' || viewMode === 'cleanup') && "overflow-hidden"
+            (viewMode === 'trash' || viewMode === 'cleanup') && "overflow-hidden"
           )}>
             {loading && (viewMode === 'grid' || viewMode === 'map') ? (
               <div className="flex items-center justify-center h-full">
@@ -224,8 +224,6 @@ export default function Index() {
               />
             ) : viewMode === 'map' ? (
               <PhotoMap photos={mapPhotos} onSelect={setSelectedPhoto} />
-            ) : viewMode === 'duplicates' ? (
-              <DuplicatesView onSelect={setSelectedPhoto} />
             ) : viewMode === 'cleanup' ? (
               <CleanupView onSelect={setSelectedPhoto} />
             ) : viewMode === 'trash' ? (

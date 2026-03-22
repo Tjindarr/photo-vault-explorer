@@ -201,6 +201,7 @@ export async function fetchCleanup(): Promise<{
   shortVideos: Photo[];
   largeVideos: Photo[];
   similarGroups: Photo[][];
+  duplicateGroups: Photo[][];
   summary: {
     screenshotCount: number;
     screenshotSize: number;
@@ -210,12 +211,15 @@ export async function fetchCleanup(): Promise<{
     largeVideoSize: number;
     similarGroupCount: number;
     similarPhotoCount: number;
+    duplicateGroupCount: number;
+    duplicatePhotoCount: number;
+    duplicateSize: number;
   };
 }> {
   if (!(await isApiAvailable())) {
     return {
-      screenshots: [], shortVideos: [], largeVideos: [], similarGroups: [],
-      summary: { screenshotCount: 0, screenshotSize: 0, shortVideoCount: 0, shortVideoSize: 0, largeVideoCount: 0, largeVideoSize: 0, similarGroupCount: 0, similarPhotoCount: 0 },
+      screenshots: [], shortVideos: [], largeVideos: [], similarGroups: [], duplicateGroups: [],
+      summary: { screenshotCount: 0, screenshotSize: 0, shortVideoCount: 0, shortVideoSize: 0, largeVideoCount: 0, largeVideoSize: 0, similarGroupCount: 0, similarPhotoCount: 0, duplicateGroupCount: 0, duplicatePhotoCount: 0, duplicateSize: 0 },
     };
   }
   return fetchJson(`${API_BASE}/cleanup`);
