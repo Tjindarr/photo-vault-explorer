@@ -651,9 +651,17 @@ def index_status():
     return indexing_status
 
 
+_cleanup_cache = {"data": None, "ts": 0}
+
 @app.get("/api/cleanup")
 def cleanup_suggestions():
     """Analyze library for cleanup: screenshots, short videos, large videos, similar groups, duplicates."""
+    import time
+    now = time.time()
+    # Cache for 60 seconds to avoid expensive recomputation
+    if _cleanup_cache["data"] is not None and now - _cleanup_cache["ts"] < 60:
+        return _cleanup_cache["data"]
+
     data = get_cleanup_data()
 
     # Format all items
