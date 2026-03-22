@@ -250,6 +250,7 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [dupExpanded, setDupExpanded] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
