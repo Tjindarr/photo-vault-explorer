@@ -12,6 +12,7 @@ export interface Photo {
   thumbnailUrl: string;
   fullUrl: string;
   fileSize: number;
+  duration?: number;
   metadata: {
     dateTaken?: string;
     location?: string;
