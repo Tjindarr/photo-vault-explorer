@@ -442,9 +442,25 @@ def get_cleanup_data() -> dict:
     """Analyze library for cleanup categories."""
     conn = get_db()
 
-    # Screenshots: filename contains 'screenshot' or 'screen shot' (case insensitive)
+    # Screenshots: filename pattern OR common phone screenshot resolutions with no camera EXIF
+    screenshot_resolutions = [
+        (1170, 2532), (1284, 2778), (1290, 2796), (1179, 2556), (1242, 2688),
+        (1125, 2436), (1080, 1920), (1242, 2208), (750, 1334), (640, 1136),
+        (1440, 3200), (1440, 3120), (1440, 3088), (1440, 2960), (1440, 2560),
+        (1080, 2400), (1080, 2340), (1080, 2310), (1080, 2280), (1080, 2160),
+        (828, 1792),
+    ]
+    res_conditions = " OR ".join(
+        f"(width={w} AND height={h}) OR (width={h} AND height={w})"
+        for w, h in screenshot_resolutions
+    )
     screenshots = [dict(r) for r in conn.execute(
-        "SELECT * FROM photos WHERE LOWER(filename) LIKE '%screenshot%' OR LOWER(filename) LIKE '%screen shot%' OR LOWER(filename) LIKE '%screen_shot%' ORDER BY date_taken DESC"
+        f"""SELECT * FROM photos WHERE type='image' AND (
+            LOWER(filename) LIKE '%screenshot%'
+            OR LOWER(filename) LIKE '%screen shot%'
+            OR LOWER(filename) LIKE '%screen_shot%'
+            OR (camera IS NULL AND ({res_conditions}))
+        ) ORDER BY date_taken DESC"""
     ).fetchall()]
 
     # Burst photos: filename patterns like IMG_1234 (1), IMG_1234_1, IMG_1234 2, etc.
