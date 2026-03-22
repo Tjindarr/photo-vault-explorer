@@ -19,6 +19,21 @@ interface PhotoMapProps {
   onSelect: (photo: Photo) => void;
 }
 
+function FitBounds({ photos, hasFilters }: { photos: Photo[]; hasFilters: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (photos.length === 0) return;
+    if (!hasFilters && photos.length > 1000) return; // skip for unfiltered full set
+    const bounds = L.latLngBounds(
+      photos.map((p) => [p.metadata.gpsLat!, p.metadata.gpsLng!] as L.LatLngTuple)
+    );
+    if (bounds.isValid()) {
+      map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 14, duration: 0.8 });
+    }
+  }, [photos, hasFilters, map]);
+  return null;
+}
+
 export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
   const [countryFilter, setCountryFilter] = useState<string>('');
   const [cityFilter, setCityFilter] = useState<string>('');
