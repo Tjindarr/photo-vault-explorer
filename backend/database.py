@@ -466,38 +466,34 @@ def get_cleanup_data() -> dict:
         ) ORDER BY date_taken DESC"""
     ).fetchall()]
 
-    # Similar/burst photos: group photos taken within 3 seconds of each other
-    # by the SAME camera AND in the SAME folder (to avoid false matches)
-    all_photos = [dict(r) for r in conn.execute(
-        "SELECT * FROM photos WHERE type='image' AND date_taken IS NOT NULL ORDER BY date_taken ASC"
+    # Similar photos: group by perceptual hash (hamming distance <= 8)
+    all_images = [dict(r) for r in conn.execute(
+        "SELECT * FROM photos WHERE type='image' AND phash IS NOT NULL ORDER BY folder, date_taken ASC"
     ).fetchall()]
 
     similar_groups = []
-    if all_photos:
-        from datetime import datetime
-        current_group = [all_photos[0]]
-        for i in range(1, len(all_photos)):
-            try:
-                prev_dt = datetime.fromisoformat(all_photos[i-1]["date_taken"])
-                curr_dt = datetime.fromisoformat(all_photos[i]["date_taken"])
-                diff = abs((curr_dt - prev_dt).total_seconds())
-                same_camera = (
-                    all_photos[i].get("camera") is not None
-                    and all_photos[i].get("camera") == all_photos[i-1].get("camera")
-                )
-                same_folder = all_photos[i]["folder"] == all_photos[i-1]["folder"]
-                if diff <= 3 and same_folder and same_camera:
-                    current_group.append(all_photos[i])
-                else:
-                    if len(current_group) >= 2:
-                        similar_groups.append(current_group)
-                    current_group = [all_photos[i]]
-            except (ValueError, TypeError):
-                if len(current_group) >= 2:
-                    similar_groups.append(current_group)
-                current_group = [all_photos[i]]
-        if len(current_group) >= 2:
-            similar_groups.append(current_group)
+    if all_images:
+        # Group by perceptual similarity using hamming distance
+        used = set()
+        for i, photo in enumerate(all_images):
+            if i in used:
+                continue
+            group = [photo]
+            ph_i = int(photo["phash"], 16)
+            for j in range(i + 1, len(all_images)):
+                if j in used:
+                    continue
+                # Only compare within same folder for performance
+                if all_images[j]["folder"] != photo["folder"]:
+                    continue
+                ph_j = int(all_images[j]["phash"], 16)
+                hamming = bin(ph_i ^ ph_j).count("1")
+                if hamming <= 8:
+                    group.append(all_images[j])
+                    used.add(j)
+            if len(group) >= 2:
+                similar_groups.append(group)
+                used.add(i)
 
     # Short videos (<=3 seconds)
     short_videos = [dict(r) for r in conn.execute(

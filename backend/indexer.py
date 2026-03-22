@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 import exifread
+import imagehash
 from PIL import Image, ExifTags, ImageOps
 from pillow_heif import register_heif_opener
 
@@ -284,6 +285,17 @@ def generate_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
         return f"{photo_id[:2]}/{thumb_filename}"
     except Exception as e:
         logger.warning(f"Thumbnail generation failed for {filepath}: {e}")
+        return None
+
+
+def compute_phash(filepath: str) -> Optional[str]:
+    """Compute perceptual hash for an image file."""
+    try:
+        with Image.open(filepath) as img:
+            h = imagehash.phash(img)
+            return str(h)
+    except Exception as e:
+        logger.warning(f"pHash computation failed for {filepath}: {e}")
         return None
 
 
