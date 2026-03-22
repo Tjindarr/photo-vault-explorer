@@ -27,6 +27,7 @@ def init_db():
             width INTEGER DEFAULT 0,
             height INTEGER DEFAULT 0,
             file_size INTEGER DEFAULT 0,
+            duration REAL,
             date_taken TEXT,
             location TEXT,
             camera TEXT,
@@ -60,6 +61,7 @@ def init_db():
             width INTEGER DEFAULT 0,
             height INTEGER DEFAULT 0,
             file_size INTEGER DEFAULT 0,
+            duration REAL,
             date_taken TEXT,
             location TEXT,
             camera TEXT,
@@ -77,6 +79,15 @@ def init_db():
 
         CREATE INDEX IF NOT EXISTS idx_trash_deleted_at ON trash(deleted_at);
     """)
+    # Add duration column if missing (migration for existing DBs)
+    try:
+        conn.execute("ALTER TABLE photos ADD COLUMN duration REAL")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE trash ADD COLUMN duration REAL")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -85,14 +96,14 @@ def upsert_photo(photo: dict):
     conn = get_db()
     conn.execute("""
         INSERT INTO photos (id, filename, path, folder, type, width, height,
-            file_size, date_taken, location, camera, lens, iso, aperture,
+            file_size, duration, date_taken, location, camera, lens, iso, aperture,
             shutter_speed, gps_lat, gps_lng, thumbnail_path, file_hash, file_modified_at)
         VALUES (:id, :filename, :path, :folder, :type, :width, :height,
-            :file_size, :date_taken, :location, :camera, :lens, :iso, :aperture,
+            :file_size, :duration, :date_taken, :location, :camera, :lens, :iso, :aperture,
             :shutter_speed, :gps_lat, :gps_lng, :thumbnail_path, :file_hash, :file_modified_at)
         ON CONFLICT(path) DO UPDATE SET
             filename=:filename, folder=:folder, type=:type, width=:width, height=:height,
-            file_size=:file_size, date_taken=:date_taken, location=:location, camera=:camera,
+            file_size=:file_size, duration=:duration, date_taken=:date_taken, location=:location, camera=:camera,
             lens=:lens, iso=:iso, aperture=:aperture, shutter_speed=:shutter_speed,
             gps_lat=:gps_lat, gps_lng=:gps_lng, thumbnail_path=:thumbnail_path,
             file_hash=:file_hash, file_modified_at=:file_modified_at,
@@ -372,10 +383,10 @@ def add_to_trash(entry: dict):
     conn = get_db()
     conn.execute("""
         INSERT OR REPLACE INTO trash (id, filename, original_path, trash_path, folder, type,
-            width, height, file_size, date_taken, location, camera, lens, iso, aperture,
+            width, height, file_size, duration, date_taken, location, camera, lens, iso, aperture,
             shutter_speed, gps_lat, gps_lng, thumbnail_path, file_hash, file_modified_at)
         VALUES (:id, :filename, :original_path, :trash_path, :folder, :type,
-            :width, :height, :file_size, :date_taken, :location, :camera, :lens, :iso, :aperture,
+            :width, :height, :file_size, :duration, :date_taken, :location, :camera, :lens, :iso, :aperture,
             :shutter_speed, :gps_lat, :gps_lng, :thumbnail_path, :file_hash, :file_modified_at)
     """, entry)
     conn.commit()
