@@ -467,31 +467,39 @@ def get_cleanup_data() -> dict:
     ).fetchall()]
 
     # Similar photos: group by perceptual hash (hamming distance <= 8)
+    # Optimized: group by folder first to avoid O(n²) across entire library
     all_images = [dict(r) for r in conn.execute(
         "SELECT * FROM photos WHERE type='image' AND phash IS NOT NULL ORDER BY folder, date_taken ASC"
     ).fetchall()]
 
     similar_groups = []
     if all_images:
-        used = set()
-        for i, photo in enumerate(all_images):
-            if i in used:
+        # Split into per-folder lists
+        from collections import defaultdict
+        folder_map = defaultdict(list)
+        for photo in all_images:
+            folder_map[photo["folder"]].append(photo)
+
+        for folder_photos in folder_map.values():
+            if len(folder_photos) < 2:
                 continue
-            group = [photo]
-            ph_i = int(photo["phash"], 16)
-            for j in range(i + 1, len(all_images)):
-                if j in used:
+            used = set()
+            for i, photo in enumerate(folder_photos):
+                if i in used:
                     continue
-                if all_images[j]["folder"] != photo["folder"]:
-                    continue
-                ph_j = int(all_images[j]["phash"], 16)
-                hamming = bin(ph_i ^ ph_j).count("1")
-                if hamming <= 8:
-                    group.append(all_images[j])
-                    used.add(j)
-            if len(group) >= 2:
-                similar_groups.append(group)
-                used.add(i)
+                group = [photo]
+                ph_i = int(photo["phash"], 16)
+                for j in range(i + 1, len(folder_photos)):
+                    if j in used:
+                        continue
+                    ph_j = int(folder_photos[j]["phash"], 16)
+                    hamming = bin(ph_i ^ ph_j).count("1")
+                    if hamming <= 8:
+                        group.append(folder_photos[j])
+                        used.add(j)
+                if len(group) >= 2:
+                    similar_groups.append(group)
+                    used.add(i)
 
     # Short videos (<=3 seconds)
     short_videos = [dict(r) for r in conn.execute(
