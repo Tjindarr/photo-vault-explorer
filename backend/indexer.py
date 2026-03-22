@@ -419,11 +419,13 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
 
         thumb_path = None
         duration = None
+        phash = None
         if is_video:
             thumb_path = generate_video_thumbnail(str(filepath), photo_id)
             duration = get_video_duration(str(filepath))
         else:
             thumb_path = generate_thumbnail(str(filepath), photo_id)
+            phash = compute_phash(str(filepath))
 
         yield {
             "id": photo_id,
@@ -446,5 +448,6 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
             "gps_lng": meta.get("gps_lng"),
             "thumbnail_path": thumb_path,
             "file_hash": fhash,
+            "phash": phash,
             "file_modified_at": datetime.fromtimestamp(file_stat.st_mtime).isoformat(),
         }
