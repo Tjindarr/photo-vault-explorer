@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Photo } from '@/lib/mock-data';
+import { Filter, X } from 'lucide-react';
 
 // Fix default marker icons for Leaflet + bundlers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -19,10 +20,46 @@ interface PhotoMapProps {
 }
 
 export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
+  const [countryFilter, setCountryFilter] = useState<string>('');
+  const [cityFilter, setCityFilter] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
+
   const geoPhotos = useMemo(
     () => photos.filter((p) => p.metadata.gpsLat != null && p.metadata.gpsLng != null),
     [photos]
   );
+
+  // Extract unique countries and cities
+  const countries = useMemo(() => {
+    const set = new Set<string>();
+    geoPhotos.forEach((p) => {
+      if ((p.metadata as any).country) set.add((p.metadata as any).country);
+    });
+    return Array.from(set).sort();
+  }, [geoPhotos]);
+
+  const cities = useMemo(() => {
+    const set = new Set<string>();
+    geoPhotos.forEach((p) => {
+      const meta = p.metadata as any;
+      if (meta.city && (!countryFilter || meta.country === countryFilter)) {
+        set.add(meta.city);
+      }
+    });
+    return Array.from(set).sort();
+  }, [geoPhotos, countryFilter]);
+
+  // Apply filters
+  const filteredPhotos = useMemo(() => {
+    return geoPhotos.filter((p) => {
+      const meta = p.metadata as any;
+      if (countryFilter && meta.country !== countryFilter) return false;
+      if (cityFilter && meta.city !== cityFilter) return false;
+      return true;
+    });
+  }, [geoPhotos, countryFilter, cityFilter]);
+
+  const hasFilters = countryFilter || cityFilter;
 
   if (geoPhotos.length === 0) {
     return (
@@ -41,11 +78,57 @@ export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
 
   return (
     <div className="h-full flex flex-col fade-in">
-      <div className="flex items-center gap-2 px-1 py-2">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 px-1 py-2 flex-wrap">
         <span className="text-xs text-muted-foreground">
-          {geoPhotos.length} geotagged photos
+          {filteredPhotos.length} of {geoPhotos.length} geotagged photos
         </span>
+        <div className="ml-auto flex items-center gap-1.5">
+          {hasFilters && (
+            <button
+              onClick={() => { setCountryFilter(''); setCityFilter(''); }}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+            >
+              <X className="h-3 w-3" /> Clear
+            </button>
+          )}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors ${
+              showFilters ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Filter className="h-3 w-3" /> Filter
+          </button>
+        </div>
       </div>
+
+      {/* Filter dropdowns */}
+      {showFilters && (
+        <div className="flex items-center gap-2 px-1 pb-2 flex-wrap">
+          <select
+            value={countryFilter}
+            onChange={(e) => { setCountryFilter(e.target.value); setCityFilter(''); }}
+            className="text-xs bg-surface border border-border rounded-md px-2 py-1.5 text-foreground min-w-[140px]"
+          >
+            <option value="">All countries</option>
+            {countries.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <select
+            value={cityFilter}
+            onChange={(e) => setCityFilter(e.target.value)}
+            className="text-xs bg-surface border border-border rounded-md px-2 py-1.5 text-foreground min-w-[140px]"
+          >
+            <option value="">All cities</option>
+            {cities.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="flex-1 rounded-lg overflow-hidden border border-border relative">
         <MapContainer
           center={[30, 10]}
@@ -65,7 +148,7 @@ export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
             spiderfyOnMaxZoom
             showCoverageOnHover={false}
           >
-            {geoPhotos.map((photo) => (
+            {filteredPhotos.map((photo) => (
               <Marker
                 key={photo.id}
                 position={[photo.metadata.gpsLat!, photo.metadata.gpsLng!]}

@@ -285,6 +285,14 @@ def get_stats() -> dict:
         "SELECT strftime('%Y', date_taken) as name, COUNT(*) as count FROM photos WHERE date_taken IS NOT NULL GROUP BY name ORDER BY name"
     ).fetchall()]
 
+    by_country = [dict(r) for r in conn.execute(
+        "SELECT country as name, COUNT(*) as count FROM photos WHERE country IS NOT NULL GROUP BY country ORDER BY count DESC"
+    ).fetchall()]
+
+    by_city = [dict(r) for r in conn.execute(
+        "SELECT city as name, COUNT(*) as count FROM photos WHERE city IS NOT NULL GROUP BY city ORDER BY count DESC"
+    ).fetchall()]
+
     conn.close()
     return {
         "total": total,
@@ -295,6 +303,8 @@ def get_stats() -> dict:
         "byCamera": by_camera,
         "byLocation": by_location,
         "byYear": by_year,
+        "byCountry": by_country,
+        "byCity": by_city,
     }
 
 
