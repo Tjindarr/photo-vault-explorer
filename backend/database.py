@@ -442,14 +442,13 @@ def get_cleanup_data() -> dict:
     """Analyze library for cleanup categories."""
     conn = get_db()
 
-    # Screenshots: filename pattern OR common phone screenshot resolutions
-    # Common iPhone/Android screenshot resolutions (portrait & landscape)
+    # Screenshots: filename pattern OR common phone screenshot resolutions with no camera EXIF
     screenshot_resolutions = [
         (1170, 2532), (1284, 2778), (1290, 2796), (1179, 2556), (1242, 2688),
         (1125, 2436), (1080, 1920), (1242, 2208), (750, 1334), (640, 1136),
         (1440, 3200), (1440, 3120), (1440, 3088), (1440, 2960), (1440, 2560),
         (1080, 2400), (1080, 2340), (1080, 2310), (1080, 2280), (1080, 2160),
-        (828, 1792), (1284, 2778),
+        (828, 1792),
     ]
     res_conditions = " OR ".join(
         f"(width={w} AND height={h}) OR (width={h} AND height={w})"
@@ -460,9 +459,7 @@ def get_cleanup_data() -> dict:
             LOWER(filename) LIKE '%screenshot%'
             OR LOWER(filename) LIKE '%screen shot%'
             OR LOWER(filename) LIKE '%screen_shot%'
-            OR LOWER(filename) LIKE '%img_%' AND ({res_conditions})
-            OR LOWER(filename) LIKE '%image_%' AND ({res_conditions})
-            OR ({res_conditions})
+            OR (camera IS NULL AND ({res_conditions}))
         ) ORDER BY date_taken DESC"""
     ).fetchall()]
 
