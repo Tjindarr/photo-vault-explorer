@@ -1,4 +1,4 @@
-import { LayoutGrid, Map, Copy, Trash2, Sparkles } from 'lucide-react';
+import { LayoutGrid, Map, Trash2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ViewMode } from '@/components/AppHeader';
 
@@ -11,7 +11,6 @@ const tabs: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
   { mode: 'grid', icon: LayoutGrid, label: 'Library' },
   { mode: 'map', icon: Map, label: 'Map' },
   { mode: 'cleanup', icon: Sparkles, label: 'Cleanup' },
-  { mode: 'duplicates', icon: Copy, label: 'Dupes' },
   { mode: 'trash', icon: Trash2, label: 'Trash' },
 ];
 

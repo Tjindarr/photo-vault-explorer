@@ -1,9 +1,9 @@
-import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw, Copy, Trash2, ImageIcon, Film, Pencil, Sparkles } from 'lucide-react';
+import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw, Trash2, ImageIcon, Film, Pencil, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { fetchIndexStatus, triggerReindex } from '@/lib/api-client';
 
-export type ViewMode = 'grid' | 'map' | 'stats' | 'duplicates' | 'trash' | 'cleanup';
+export type ViewMode = 'grid' | 'map' | 'stats' | 'trash' | 'cleanup';
 
 interface AppHeaderProps {
   onToggleSidebar: () => void;
@@ -22,7 +22,6 @@ const views: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
   { mode: 'grid', icon: LayoutGrid, label: 'Grid view' },
   { mode: 'map', icon: Map, label: 'Map view' },
   { mode: 'cleanup', icon: Sparkles, label: 'Cleanup' },
-  { mode: 'duplicates', icon: Copy, label: 'Duplicates' },
   { mode: 'trash', icon: Trash2, label: 'Trash' },
   { mode: 'stats', icon: BarChart3, label: 'Stats' },
 ];
