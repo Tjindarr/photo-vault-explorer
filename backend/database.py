@@ -473,7 +473,6 @@ def get_cleanup_data() -> dict:
 
     similar_groups = []
     if all_images:
-        # Group by perceptual similarity using hamming distance
         used = set()
         for i, photo in enumerate(all_images):
             if i in used:
@@ -483,7 +482,6 @@ def get_cleanup_data() -> dict:
             for j in range(i + 1, len(all_images)):
                 if j in used:
                     continue
-                # Only compare within same folder for performance
                 if all_images[j]["folder"] != photo["folder"]:
                     continue
                 ph_j = int(all_images[j]["phash"], 16)
@@ -505,6 +503,27 @@ def get_cleanup_data() -> dict:
         "SELECT * FROM photos WHERE type='video' AND file_size > 104857600 ORDER BY file_size DESC"
     ).fetchall()]
 
+    # Exact duplicates: files with same hash across ALL folders
+    dup_hashes = conn.execute(
+        "SELECT file_hash FROM photos WHERE file_hash IS NOT NULL GROUP BY file_hash HAVING COUNT(*) > 1"
+    ).fetchall()
+    duplicate_groups = []
+    if dup_hashes:
+        hash_list = [row["file_hash"] for row in dup_hashes]
+        placeholders = ",".join("?" for _ in hash_list)
+        dup_rows = conn.execute(
+            f"SELECT * FROM photos WHERE file_hash IN ({placeholders}) ORDER BY file_hash, date_taken DESC",
+            hash_list,
+        ).fetchall()
+        # Group by hash
+        groups_map: dict[str, list] = {}
+        for r in dup_rows:
+            h = r["file_hash"]
+            if h not in groups_map:
+                groups_map[h] = []
+            groups_map[h].append(dict(r))
+        duplicate_groups = [photos for photos in groups_map.values() if len(photos) >= 2]
+
     conn.close()
 
     return {
@@ -512,4 +531,5 @@ def get_cleanup_data() -> dict:
         "shortVideos": short_videos,
         "largeVideos": large_videos,
         "similarGroups": similar_groups,
+        "duplicateGroups": duplicate_groups,
     }

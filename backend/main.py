@@ -653,7 +653,7 @@ def index_status():
 
 @app.get("/api/cleanup")
 def cleanup_suggestions():
-    """Analyze library for cleanup: screenshots, short videos, large videos, similar groups."""
+    """Analyze library for cleanup: screenshots, short videos, large videos, similar groups, duplicates."""
     data = get_cleanup_data()
 
     # Format all items
@@ -664,6 +664,10 @@ def cleanup_suggestions():
         "similarGroups": [
             [_format_photo(p) for p in group]
             for group in data["similarGroups"]
+        ],
+        "duplicateGroups": [
+            [_format_photo(p) for p in group]
+            for group in data["duplicateGroups"]
         ],
     }
 
@@ -677,6 +681,12 @@ def cleanup_suggestions():
         "largeVideoSize": sum(p["fileSize"] for p in result["largeVideos"]),
         "similarGroupCount": len(result["similarGroups"]),
         "similarPhotoCount": sum(len(g) for g in result["similarGroups"]),
+        "duplicateGroupCount": len(result["duplicateGroups"]),
+        "duplicatePhotoCount": sum(len(g) for g in result["duplicateGroups"]),
+        "duplicateSize": sum(
+            sum(p["fileSize"] for p in g[1:])  # wasted size (all but first)
+            for g in result["duplicateGroups"]
+        ),
     }
 
     return result
