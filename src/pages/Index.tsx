@@ -172,6 +172,7 @@ export default function Index() {
         }}
         selectedCount={selectedIds.size}
         onDeleteSelected={handleDeleteSelected}
+        onReindexComplete={loadPhotos}
       />
       <div className="flex flex-1 min-h-0">
         <FolderSidebar

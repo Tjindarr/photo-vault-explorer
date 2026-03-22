@@ -1,6 +1,6 @@
 import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw, Copy, Trash2, ImageIcon, Film, Pencil, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { fetchIndexStatus, triggerReindex } from '@/lib/api-client';
 
 export type ViewMode = 'grid' | 'map' | 'stats' | 'duplicates' | 'trash' | 'cleanup';
@@ -15,6 +15,7 @@ interface AppHeaderProps {
   onDeleteModeChange?: (on: boolean) => void;
   selectedCount?: number;
   onDeleteSelected?: () => void;
+  onReindexComplete?: () => void;
 }
 
 const views: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
@@ -73,10 +74,19 @@ function useIndexStatus() {
   return { status, refresh: poll };
 }
 
-export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange, typeFilter, onTypeFilterChange, deleteMode, onDeleteModeChange, selectedCount = 0, onDeleteSelected }: AppHeaderProps) {
+export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange, typeFilter, onTypeFilterChange, deleteMode, onDeleteModeChange, selectedCount = 0, onDeleteSelected, onReindexComplete }: AppHeaderProps) {
   const { dark, toggle } = useTheme();
   const { status: indexStatus, refresh } = useIndexStatus();
   const [reindexing, setReindexing] = useState(false);
+  const wasRunningRef = useRef(false);
+
+  useEffect(() => {
+    if (wasRunningRef.current && !indexStatus.running) {
+      setReindexing(false);
+      onReindexComplete?.();
+    }
+    wasRunningRef.current = indexStatus.running;
+  }, [indexStatus.running, onReindexComplete]);
 
   const handleReindex = async () => {
     if (indexStatus.running || reindexing) return;
@@ -86,7 +96,6 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
       await refresh();
     } catch (error) {
       console.error('Failed to trigger reindex:', error);
-    } finally {
       setReindexing(false);
     }
   };
@@ -117,7 +126,6 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
           </div>
         )}
 
-        {/* Type filter toggles — grid/map only */}
         {(viewMode === 'grid' || viewMode === 'map') && onTypeFilterChange && (
           <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5 ml-1">
             <button
@@ -146,7 +154,6 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
           </div>
         )}
 
-        {/* Delete mode toggle — grid only */}
         {viewMode === 'grid' && onDeleteModeChange && (
           <button
             onClick={() => onDeleteModeChange(!deleteMode)}
@@ -187,7 +194,6 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
           <span className="hidden sm:inline">Reindex</span>
         </button>
 
-        {/* Stats button — always visible */}
         <button
           onClick={() => onViewModeChange('stats')}
           className={cn(
@@ -201,7 +207,6 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
           <BarChart3 className="h-4 w-4" />
         </button>
 
-        {/* Desktop-only view switcher */}
         <div className="hidden lg:flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {views.map(({ mode, icon: Icon, label }) => (
             <button
