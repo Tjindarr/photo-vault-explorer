@@ -508,6 +508,9 @@ export default function CleanupView({ onSelect }: { onSelect: (photo: Photo) => 
           onClearAll={clearSimilar}
           onView={onSelect}
           summary={summary}
+          ignoredGroups={ignoredGroups}
+          onIgnoreGroup={ignoreGroup}
+          onResetIgnored={resetIgnored}
         />
 
         {/* Exact Duplicates */}
