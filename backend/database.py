@@ -436,3 +436,60 @@ def purge_expired_trash(days: int = 30) -> list[dict]:
         conn.commit()
     conn.close()
     return expired
+
+
+def get_cleanup_data() -> dict:
+    """Analyze library for cleanup categories."""
+    conn = get_db()
+
+    # Screenshots: filename contains 'screenshot' or 'screen shot' (case insensitive)
+    screenshots = [dict(r) for r in conn.execute(
+        "SELECT * FROM photos WHERE LOWER(filename) LIKE '%screenshot%' OR LOWER(filename) LIKE '%screen shot%' OR LOWER(filename) LIKE '%screen_shot%' ORDER BY date_taken DESC"
+    ).fetchall()]
+
+    # Burst photos: filename patterns like IMG_1234 (1), IMG_1234_1, IMG_1234 2, etc.
+    # Group photos taken within 3 seconds of each other by the same camera
+    all_photos = [dict(r) for r in conn.execute(
+        "SELECT * FROM photos WHERE date_taken IS NOT NULL ORDER BY date_taken ASC"
+    ).fetchall()]
+
+    similar_groups = []
+    if all_photos:
+        from datetime import datetime
+        current_group = [all_photos[0]]
+        for i in range(1, len(all_photos)):
+            try:
+                prev_dt = datetime.fromisoformat(all_photos[i-1]["date_taken"])
+                curr_dt = datetime.fromisoformat(all_photos[i]["date_taken"])
+                diff = abs((curr_dt - prev_dt).total_seconds())
+                if diff <= 5:
+                    current_group.append(all_photos[i])
+                else:
+                    if len(current_group) >= 2:
+                        similar_groups.append(current_group)
+                    current_group = [all_photos[i]]
+            except (ValueError, TypeError):
+                if len(current_group) >= 2:
+                    similar_groups.append(current_group)
+                current_group = [all_photos[i]]
+        if len(current_group) >= 2:
+            similar_groups.append(current_group)
+
+    # Short videos (<=3 seconds)
+    short_videos = [dict(r) for r in conn.execute(
+        "SELECT * FROM photos WHERE type='video' AND duration IS NOT NULL AND duration <= 3 ORDER BY date_taken DESC"
+    ).fetchall()]
+
+    # Large videos (>100MB)
+    large_videos = [dict(r) for r in conn.execute(
+        "SELECT * FROM photos WHERE type='video' AND file_size > 104857600 ORDER BY file_size DESC"
+    ).fetchall()]
+
+    conn.close()
+
+    return {
+        "screenshots": screenshots,
+        "shortVideos": short_videos,
+        "largeVideos": large_videos,
+        "similarGroups": similar_groups,
+    }

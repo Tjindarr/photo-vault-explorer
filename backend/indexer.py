@@ -334,6 +334,25 @@ def generate_video_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
         return None
 
 
+def get_video_duration(filepath: str) -> Optional[float]:
+    """Get video duration in seconds using ffprobe."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                filepath,
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return float(result.stdout.strip())
+    except Exception as e:
+        logger.warning(f"Failed to get video duration for {filepath}: {e}")
+    return None
+
+
 def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
     """Scan directory recursively. Yields None for skipped files, dict for new/changed."""
     if known_hashes is None:
