@@ -197,4 +197,31 @@ export async function emptyTrash(ids?: string[]): Promise<{ deleted: number }> {
   return res.json();
 }
 
+export async function fetchCleanup(): Promise<{
+  screenshots: Photo[];
+  shortVideos: Photo[];
+  largeVideos: Photo[];
+  similarGroups: Photo[][];
+  summary: {
+    screenshotCount: number;
+    screenshotSize: number;
+    shortVideoCount: number;
+    shortVideoSize: number;
+    largeVideoCount: number;
+    largeVideoSize: number;
+    similarGroupCount: number;
+    similarPhotoCount: number;
+  };
+}> {
+  if (!(await isApiAvailable())) {
+    return {
+      screenshots: [], shortVideos: [], largeVideos: [], similarGroups: [],
+      summary: { screenshotCount: 0, screenshotSize: 0, shortVideoCount: 0, shortVideoSize: 0, largeVideoCount: 0, largeVideoSize: 0, similarGroupCount: 0, similarPhotoCount: 0 },
+    };
+  }
+  const res = await fetch(`${API_BASE}/cleanup`);
+  if (!res.ok) throw new Error('Failed to fetch cleanup data');
+  return res.json();
+}
+
 export { isApiAvailable };
