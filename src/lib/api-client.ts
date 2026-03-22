@@ -138,7 +138,7 @@ export async function fetchMapPhotos(params: {
 }
 
 export async function triggerReindex(): Promise<{ message: string }> {
-  return fetchJson(`${API_BASE}/reindex`, { method: 'POST' });
+  return fetchJson(`${API_BASE}/reindex?full=true`, { method: 'POST' });
 }
 
 export async function fetchIndexStatus(): Promise<{
