@@ -23,6 +23,8 @@ export interface Photo {
     shutterSpeed?: string;
     gpsLat?: number;
     gpsLng?: number;
+    country?: string;
+    city?: string;
   };
   createdAt: string;
 }
