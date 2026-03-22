@@ -379,7 +379,7 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
 
       {/* Thumbnail strip at bottom — desktop only */}
       <div
-        className="shrink-0 hidden sm:block bg-overlay/80 backdrop-blur-sm border-t border-white/10 py-2 px-2"
+        className="shrink-0 bg-overlay/80 backdrop-blur-sm border-t border-white/10 py-1.5 sm:py-2 px-1 sm:px-2"
         onClick={(e) => e.stopPropagation()}
       >
         <div
