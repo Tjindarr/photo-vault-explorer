@@ -17,6 +17,7 @@ from database import (
     get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths,
     get_map_photos, get_duplicate_photos, delete_photos_by_ids,
     add_to_trash, get_trash_items, get_trash_item_by_id, remove_from_trash, purge_expired_trash,
+    get_cleanup_data,
 )
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 
@@ -402,6 +403,7 @@ def _format_photo(p: dict) -> dict:
         "fullUrl": f"/api/media/{p['id']}",
         "fileSize": p["file_size"],
         "fileHash": p.get("file_hash"),
+        "duration": p.get("duration"),
         "metadata": {
             "dateTaken": p["date_taken"],
             "location": p["location"],
@@ -502,6 +504,7 @@ def delete_photos_endpoint(req: DeletePhotosRequest):
             "width": entry["width"],
             "height": entry["height"],
             "file_size": entry["file_size"],
+            "duration": entry.get("duration"),
             "date_taken": entry.get("date_taken"),
             "location": entry.get("location"),
             "camera": entry.get("camera"),
@@ -576,6 +579,7 @@ def restore_from_trash(req: RestoreRequest):
                     "width": item["width"],
                     "height": item["height"],
                     "file_size": item["file_size"],
+                    "duration": item.get("duration"),
                     "date_taken": item.get("date_taken"),
                     "location": item.get("location"),
                     "camera": item.get("camera"),
@@ -642,6 +646,37 @@ def reindex():
 @app.get("/api/index-status")
 def index_status():
     return indexing_status
+
+
+@app.get("/api/cleanup")
+def cleanup_suggestions():
+    """Analyze library for cleanup: screenshots, short videos, large videos, similar groups."""
+    data = get_cleanup_data()
+
+    # Format all items
+    result = {
+        "screenshots": [_format_photo(p) for p in data["screenshots"]],
+        "shortVideos": [_format_photo(p) for p in data["shortVideos"]],
+        "largeVideos": [_format_photo(p) for p in data["largeVideos"]],
+        "similarGroups": [
+            [_format_photo(p) for p in group]
+            for group in data["similarGroups"]
+        ],
+    }
+
+    # Summary stats
+    result["summary"] = {
+        "screenshotCount": len(result["screenshots"]),
+        "screenshotSize": sum(p["fileSize"] for p in result["screenshots"]),
+        "shortVideoCount": len(result["shortVideos"]),
+        "shortVideoSize": sum(p["fileSize"] for p in result["shortVideos"]),
+        "largeVideoCount": len(result["largeVideos"]),
+        "largeVideoSize": sum(p["fileSize"] for p in result["largeVideos"]),
+        "similarGroupCount": len(result["similarGroups"]),
+        "similarPhotoCount": sum(len(g) for g in result["similarGroups"]),
+    }
+
+    return result
 
 
 @app.get("/api/health")

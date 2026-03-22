@@ -27,6 +27,7 @@ def init_db():
             width INTEGER DEFAULT 0,
             height INTEGER DEFAULT 0,
             file_size INTEGER DEFAULT 0,
+            duration REAL,
             date_taken TEXT,
             location TEXT,
             camera TEXT,
@@ -60,6 +61,7 @@ def init_db():
             width INTEGER DEFAULT 0,
             height INTEGER DEFAULT 0,
             file_size INTEGER DEFAULT 0,
+            duration REAL,
             date_taken TEXT,
             location TEXT,
             camera TEXT,
@@ -77,6 +79,15 @@ def init_db():
 
         CREATE INDEX IF NOT EXISTS idx_trash_deleted_at ON trash(deleted_at);
     """)
+    # Add duration column if missing (migration for existing DBs)
+    try:
+        conn.execute("ALTER TABLE photos ADD COLUMN duration REAL")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE trash ADD COLUMN duration REAL")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -85,14 +96,14 @@ def upsert_photo(photo: dict):
     conn = get_db()
     conn.execute("""
         INSERT INTO photos (id, filename, path, folder, type, width, height,
-            file_size, date_taken, location, camera, lens, iso, aperture,
+            file_size, duration, date_taken, location, camera, lens, iso, aperture,
             shutter_speed, gps_lat, gps_lng, thumbnail_path, file_hash, file_modified_at)
         VALUES (:id, :filename, :path, :folder, :type, :width, :height,
-            :file_size, :date_taken, :location, :camera, :lens, :iso, :aperture,
+            :file_size, :duration, :date_taken, :location, :camera, :lens, :iso, :aperture,
             :shutter_speed, :gps_lat, :gps_lng, :thumbnail_path, :file_hash, :file_modified_at)
         ON CONFLICT(path) DO UPDATE SET
             filename=:filename, folder=:folder, type=:type, width=:width, height=:height,
-            file_size=:file_size, date_taken=:date_taken, location=:location, camera=:camera,
+            file_size=:file_size, duration=:duration, date_taken=:date_taken, location=:location, camera=:camera,
             lens=:lens, iso=:iso, aperture=:aperture, shutter_speed=:shutter_speed,
             gps_lat=:gps_lat, gps_lng=:gps_lng, thumbnail_path=:thumbnail_path,
             file_hash=:file_hash, file_modified_at=:file_modified_at,
@@ -372,10 +383,10 @@ def add_to_trash(entry: dict):
     conn = get_db()
     conn.execute("""
         INSERT OR REPLACE INTO trash (id, filename, original_path, trash_path, folder, type,
-            width, height, file_size, date_taken, location, camera, lens, iso, aperture,
+            width, height, file_size, duration, date_taken, location, camera, lens, iso, aperture,
             shutter_speed, gps_lat, gps_lng, thumbnail_path, file_hash, file_modified_at)
         VALUES (:id, :filename, :original_path, :trash_path, :folder, :type,
-            :width, :height, :file_size, :date_taken, :location, :camera, :lens, :iso, :aperture,
+            :width, :height, :file_size, :duration, :date_taken, :location, :camera, :lens, :iso, :aperture,
             :shutter_speed, :gps_lat, :gps_lng, :thumbnail_path, :file_hash, :file_modified_at)
     """, entry)
     conn.commit()
@@ -425,3 +436,60 @@ def purge_expired_trash(days: int = 30) -> list[dict]:
         conn.commit()
     conn.close()
     return expired
+
+
+def get_cleanup_data() -> dict:
+    """Analyze library for cleanup categories."""
+    conn = get_db()
+
+    # Screenshots: filename contains 'screenshot' or 'screen shot' (case insensitive)
+    screenshots = [dict(r) for r in conn.execute(
+        "SELECT * FROM photos WHERE LOWER(filename) LIKE '%screenshot%' OR LOWER(filename) LIKE '%screen shot%' OR LOWER(filename) LIKE '%screen_shot%' ORDER BY date_taken DESC"
+    ).fetchall()]
+
+    # Burst photos: filename patterns like IMG_1234 (1), IMG_1234_1, IMG_1234 2, etc.
+    # Group photos taken within 3 seconds of each other by the same camera
+    all_photos = [dict(r) for r in conn.execute(
+        "SELECT * FROM photos WHERE date_taken IS NOT NULL ORDER BY date_taken ASC"
+    ).fetchall()]
+
+    similar_groups = []
+    if all_photos:
+        from datetime import datetime
+        current_group = [all_photos[0]]
+        for i in range(1, len(all_photos)):
+            try:
+                prev_dt = datetime.fromisoformat(all_photos[i-1]["date_taken"])
+                curr_dt = datetime.fromisoformat(all_photos[i]["date_taken"])
+                diff = abs((curr_dt - prev_dt).total_seconds())
+                if diff <= 5:
+                    current_group.append(all_photos[i])
+                else:
+                    if len(current_group) >= 2:
+                        similar_groups.append(current_group)
+                    current_group = [all_photos[i]]
+            except (ValueError, TypeError):
+                if len(current_group) >= 2:
+                    similar_groups.append(current_group)
+                current_group = [all_photos[i]]
+        if len(current_group) >= 2:
+            similar_groups.append(current_group)
+
+    # Short videos (<=3 seconds)
+    short_videos = [dict(r) for r in conn.execute(
+        "SELECT * FROM photos WHERE type='video' AND duration IS NOT NULL AND duration <= 3 ORDER BY date_taken DESC"
+    ).fetchall()]
+
+    # Large videos (>100MB)
+    large_videos = [dict(r) for r in conn.execute(
+        "SELECT * FROM photos WHERE type='video' AND file_size > 104857600 ORDER BY file_size DESC"
+    ).fetchall()]
+
+    conn.close()
+
+    return {
+        "screenshots": screenshots,
+        "shortVideos": short_videos,
+        "largeVideos": large_videos,
+        "similarGroups": similar_groups,
+    }

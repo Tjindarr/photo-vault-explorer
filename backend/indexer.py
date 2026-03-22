@@ -334,6 +334,25 @@ def generate_video_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
         return None
 
 
+def get_video_duration(filepath: str) -> Optional[float]:
+    """Get video duration in seconds using ffprobe."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                filepath,
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return float(result.stdout.strip())
+    except Exception as e:
+        logger.warning(f"Failed to get video duration for {filepath}: {e}")
+    return None
+
+
 def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
     """Scan directory recursively. Yields None for skipped files, dict for new/changed."""
     if known_hashes is None:
@@ -387,8 +406,10 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
             meta["date_taken"] = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
 
         thumb_path = None
+        duration = None
         if is_video:
             thumb_path = generate_video_thumbnail(str(filepath), photo_id)
+            duration = get_video_duration(str(filepath))
         else:
             thumb_path = generate_thumbnail(str(filepath), photo_id)
 
@@ -401,6 +422,7 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
             "width": meta.get("width", 0),
             "height": meta.get("height", 0),
             "file_size": file_stat.st_size,
+            "duration": duration,
             "date_taken": meta.get("date_taken"),
             "location": meta.get("location"),
             "camera": meta.get("camera"),
