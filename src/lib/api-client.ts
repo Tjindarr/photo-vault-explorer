@@ -3,9 +3,16 @@ import { mockPhotos, mockFolderTree, type Photo, type Folder } from './mock-data
 const API_BASE = '/api';
 
 let _apiAvailable: boolean | null = null;
+let _lastApiCheck = 0;
+const API_CHECK_TTL_MS = 5000;
 
-async function isApiAvailable(): Promise<boolean> {
-  if (_apiAvailable !== null) return _apiAvailable;
+async function isApiAvailable(force = false): Promise<boolean> {
+  const now = Date.now();
+
+  if (!force && _apiAvailable === true) return true;
+  if (!force && _apiAvailable === false && now - _lastApiCheck < API_CHECK_TTL_MS) return false;
+
+  _lastApiCheck = now;
   try {
     const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000) });
     _apiAvailable = res.ok;

@@ -86,12 +86,20 @@ export default function Index() {
   // Initial load
   useEffect(() => {
     const init = async () => {
-      await isApiAvailable();
+      const apiReady = await isApiAvailable(true);
       const [, foldersResult] = await Promise.all([
         loadPhotos(),
         fetchFolders(),
       ]);
       setFolders(foldersResult);
+
+      if (!apiReady) {
+        window.setTimeout(() => {
+          isApiAvailable(true).then((ready) => {
+            if (ready) loadPhotos();
+          });
+        }, 3000);
+      }
     };
     init();
   // eslint-disable-next-line react-hooks/exhaustive-deps
