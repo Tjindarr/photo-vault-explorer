@@ -53,8 +53,8 @@ def get_current_media_paths() -> set[str]:
     return current_paths
 
 
-def run_indexer():
-    """Background indexing task — skips files already indexed with same hash."""
+def run_indexer(force_full: bool = False):
+    """Background indexing task. When force_full=True, reprocess all files."""
     indexing_status["running"] = True
     indexing_status["progress"] = 0
     indexing_status["total"] = 0
@@ -71,9 +71,12 @@ def run_indexer():
         if expired:
             logger.info(f"Purged {len(expired)} expired trash items")
 
-        # Load existing indexed hashes to skip unchanged files
-        known_hashes = get_indexed_hashes()
-        logger.info(f"Found {len(known_hashes)} already-indexed files in DB")
+        # Load existing indexed hashes to skip unchanged files unless full reindex is requested
+        known_hashes = {} if force_full else get_indexed_hashes()
+        if force_full:
+            logger.info("Running full reindex; all files will be reprocessed")
+        else:
+            logger.info(f"Found {len(known_hashes)} already-indexed files in DB")
 
         current_paths = get_current_media_paths()
         logger.info(f"Found {len(current_paths)} media files on disk")
@@ -631,16 +634,16 @@ def empty_trash(req: EmptyTrashRequest):
 
 
 @app.post("/api/reindex")
-def reindex():
+def reindex(full: bool = Query(True, description="Reprocess all files, even unchanged ones")):
     if indexing_status["running"]:
         return JSONResponse(
             status_code=409,
             content={"message": "Indexing already in progress", "status": indexing_status},
         )
 
-    thread = threading.Thread(target=run_indexer, daemon=True)
+    thread = threading.Thread(target=run_indexer, kwargs={"force_full": full}, daemon=True)
     thread.start()
-    return {"message": "Reindexing started", "status": indexing_status}
+    return {"message": "Reindexing started", "status": indexing_status, "full": full}
 
 
 @app.get("/api/index-status")
