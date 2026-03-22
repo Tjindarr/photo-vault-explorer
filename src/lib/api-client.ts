@@ -103,6 +103,17 @@ export async function fetchStats(): Promise<any> {
   return fetchJson(`${API_BASE}/stats`);
 }
 
+export interface MapCluster {
+  id: string;
+  label: string;
+  country: string | null;
+  city: string | null;
+  lat: number;
+  lng: number;
+  count: number;
+  thumbnailUrl: string | null;
+}
+
 export async function fetchMapPhotos(params: {
   query?: string;
   folder?: string;
@@ -135,6 +146,35 @@ export async function fetchMapPhotos(params: {
   if (params.limit) searchParams.set('limit', String(params.limit));
 
   return fetchJson(`${API_BASE}/map-photos?${searchParams}`);
+}
+
+export async function fetchMapClusters(params: {
+  query?: string;
+  folder?: string;
+  country?: string;
+  city?: string;
+}): Promise<{ clusters: MapCluster[]; total: number }> {
+  if (!(await isApiAvailable())) {
+    return { clusters: [], total: 0 };
+  }
+  const searchParams = new URLSearchParams();
+  if (params.query) searchParams.set('q', params.query);
+  if (params.folder) searchParams.set('folder', params.folder);
+  if (params.country) searchParams.set('country', params.country);
+  if (params.city) searchParams.set('city', params.city);
+
+  return fetchJson(`${API_BASE}/map-clusters?${searchParams}`);
+}
+
+export async function fetchMapCountries(): Promise<{ name: string; count: number }[]> {
+  if (!(await isApiAvailable())) return [];
+  return fetchJson(`${API_BASE}/map-countries`);
+}
+
+export async function fetchMapCities(country?: string): Promise<{ name: string; count: number }[]> {
+  if (!(await isApiAvailable())) return [];
+  const params = country ? `?country=${encodeURIComponent(country)}` : '';
+  return fetchJson(`${API_BASE}/map-cities${params}`);
 }
 
 export async function triggerReindex(): Promise<{ message: string }> {
