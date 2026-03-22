@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useMemo, useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -17,6 +17,21 @@ L.Icon.Default.mergeOptions({
 interface PhotoMapProps {
   photos: Photo[];
   onSelect: (photo: Photo) => void;
+}
+
+function FitBounds({ photos, hasFilters }: { photos: Photo[]; hasFilters: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (photos.length === 0) return;
+    if (!hasFilters && photos.length > 1000) return; // skip for unfiltered full set
+    const bounds = L.latLngBounds(
+      photos.map((p) => [p.metadata.gpsLat!, p.metadata.gpsLng!] as L.LatLngTuple)
+    );
+    if (bounds.isValid()) {
+      map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 14, duration: 0.8 });
+    }
+  }, [photos, hasFilters, map]);
+  return null;
 }
 
 export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
@@ -138,6 +153,7 @@ export default function PhotoMap({ photos, onSelect }: PhotoMapProps) {
           scrollWheelZoom={true}
           zoomControl={false}
         >
+          <FitBounds photos={filteredPhotos} hasFilters={!!hasFilters} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
