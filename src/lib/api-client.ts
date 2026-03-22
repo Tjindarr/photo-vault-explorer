@@ -6,6 +6,20 @@ let _apiAvailable: boolean | null = null;
 let _lastApiCheck = 0;
 const API_CHECK_TTL_MS = 5000;
 
+function isJsonResponse(res: Response) {
+  const contentType = res.headers.get('content-type') || '';
+  return contentType.includes('application/json');
+}
+
+async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(input, init);
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  if (!isJsonResponse(res)) {
+    throw new Error('API returned non-JSON response');
+  }
+  return res.json();
+}
+
 async function isApiAvailable(force = false): Promise<boolean> {
   const now = Date.now();
 
@@ -15,7 +29,7 @@ async function isApiAvailable(force = false): Promise<boolean> {
   _lastApiCheck = now;
   try {
     const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000) });
-    _apiAvailable = res.ok;
+    _apiAvailable = res.ok && isJsonResponse(res);
   } catch {
     _apiAvailable = false;
   }
@@ -74,25 +88,19 @@ export async function fetchPhotos(params: {
   if (params.limit) searchParams.set('limit', String(params.limit));
   if (params.offset) searchParams.set('offset', String(params.offset));
 
-  const res = await fetch(`${API_BASE}/photos?${searchParams}`);
-  if (!res.ok) throw new Error('Failed to fetch photos');
-  return res.json();
+  return fetchJson(`${API_BASE}/photos?${searchParams}`);
 }
 
 export async function fetchFolders(): Promise<Folder[]> {
   if (!(await isApiAvailable())) return mockFolderTree;
 
-  const res = await fetch(`${API_BASE}/folders`);
-  if (!res.ok) throw new Error('Failed to fetch folders');
-  return res.json();
+  return fetchJson(`${API_BASE}/folders`);
 }
 
 export async function fetchStats(): Promise<any> {
   if (!(await isApiAvailable())) return null;
 
-  const res = await fetch(`${API_BASE}/stats`);
-  if (!res.ok) throw new Error('Failed to fetch stats');
-  return res.json();
+  return fetchJson(`${API_BASE}/stats`);
 }
 
 export async function fetchMapPhotos(params: {
@@ -126,15 +134,11 @@ export async function fetchMapPhotos(params: {
   if (params.folder) searchParams.set('folder', params.folder);
   if (params.limit) searchParams.set('limit', String(params.limit));
 
-  const res = await fetch(`${API_BASE}/map-photos?${searchParams}`);
-  if (!res.ok) throw new Error('Failed to fetch map photos');
-  return res.json();
+  return fetchJson(`${API_BASE}/map-photos?${searchParams}`);
 }
 
 export async function triggerReindex(): Promise<{ message: string }> {
-  const res = await fetch(`${API_BASE}/reindex`, { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to trigger reindex');
-  return res.json();
+  return fetchJson(`${API_BASE}/reindex`, { method: 'POST' });
 }
 
 export async function fetchIndexStatus(): Promise<{
@@ -146,9 +150,7 @@ export async function fetchIndexStatus(): Promise<{
   if (!(await isApiAvailable())) {
     return { running: false, progress: 0, total: 0, last_run: null };
   }
-  const res = await fetch(`${API_BASE}/index-status`);
-  if (!res.ok) throw new Error('Failed to fetch index status');
-  return res.json();
+  return fetchJson(`${API_BASE}/index-status`);
 }
 
 export async function fetchDuplicates(): Promise<{
@@ -159,19 +161,15 @@ export async function fetchDuplicates(): Promise<{
   if (!(await isApiAvailable())) {
     return { groups: [], totalGroups: 0, totalDuplicates: 0 };
   }
-  const res = await fetch(`${API_BASE}/duplicates`);
-  if (!res.ok) throw new Error('Failed to fetch duplicates');
-  return res.json();
+  return fetchJson(`${API_BASE}/duplicates`);
 }
 
 export async function deletePhotos(ids: string[]): Promise<{ deleted: number }> {
-  const res = await fetch(`${API_BASE}/photos/delete`, {
+  return fetchJson(`${API_BASE}/photos/delete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids }),
   });
-  if (!res.ok) throw new Error('Failed to delete photos');
-  return res.json();
 }
 
 export async function fetchTrash(): Promise<{
@@ -179,29 +177,23 @@ export async function fetchTrash(): Promise<{
   total: number;
 }> {
   if (!(await isApiAvailable())) return { items: [], total: 0 };
-  const res = await fetch(`${API_BASE}/trash`);
-  if (!res.ok) throw new Error('Failed to fetch trash');
-  return res.json();
+  return fetchJson(`${API_BASE}/trash`);
 }
 
 export async function restoreFromTrash(ids: string[]): Promise<{ restored: number }> {
-  const res = await fetch(`${API_BASE}/trash/restore`, {
+  return fetchJson(`${API_BASE}/trash/restore`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids }),
   });
-  if (!res.ok) throw new Error('Failed to restore from trash');
-  return res.json();
 }
 
 export async function emptyTrash(ids?: string[]): Promise<{ deleted: number }> {
-  const res = await fetch(`${API_BASE}/trash/empty`, {
+  return fetchJson(`${API_BASE}/trash/empty`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids: ids || null }),
   });
-  if (!res.ok) throw new Error('Failed to empty trash');
-  return res.json();
 }
 
 export async function fetchCleanup(): Promise<{
@@ -226,9 +218,7 @@ export async function fetchCleanup(): Promise<{
       summary: { screenshotCount: 0, screenshotSize: 0, shortVideoCount: 0, shortVideoSize: 0, largeVideoCount: 0, largeVideoSize: 0, similarGroupCount: 0, similarPhotoCount: 0 },
     };
   }
-  const res = await fetch(`${API_BASE}/cleanup`);
-  if (!res.ok) throw new Error('Failed to fetch cleanup data');
-  return res.json();
+  return fetchJson(`${API_BASE}/cleanup`);
 }
 
 export { isApiAvailable };
