@@ -17,6 +17,7 @@ from database import (
     get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths,
     get_map_photos, get_duplicate_photos, delete_photos_by_ids,
     add_to_trash, get_trash_items, get_trash_item_by_id, remove_from_trash, purge_expired_trash,
+    get_cleanup_data,
 )
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 

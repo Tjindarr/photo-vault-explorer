@@ -406,8 +406,10 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
             meta["date_taken"] = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
 
         thumb_path = None
+        duration = None
         if is_video:
             thumb_path = generate_video_thumbnail(str(filepath), photo_id)
+            duration = get_video_duration(str(filepath))
         else:
             thumb_path = generate_thumbnail(str(filepath), photo_id)
 
@@ -420,6 +422,7 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
             "width": meta.get("width", 0),
             "height": meta.get("height", 0),
             "file_size": file_stat.st_size,
+            "duration": duration,
             "date_taken": meta.get("date_taken"),
             "location": meta.get("location"),
             "camera": meta.get("camera"),
