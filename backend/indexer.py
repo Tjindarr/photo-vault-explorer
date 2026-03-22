@@ -12,6 +12,8 @@ import imagehash
 from PIL import Image, ExifTags, ImageOps
 from pillow_heif import register_heif_opener
 
+from geocoder import reverse_geocode
+
 # Register HEIC/HEIF support with Pillow
 register_heif_opener()
 
@@ -427,6 +429,15 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
             thumb_path = generate_thumbnail(str(filepath), photo_id)
             phash = compute_phash(str(filepath))
 
+        # Reverse geocode GPS coordinates
+        geo = {"country": None, "city": None, "location_name": None}
+        gps_lat = meta.get("gps_lat")
+        gps_lng = meta.get("gps_lng")
+        if gps_lat is not None and gps_lng is not None:
+            geo = reverse_geocode(gps_lat, gps_lng)
+
+        location = geo.get("location_name") or meta.get("location")
+
         yield {
             "id": photo_id,
             "filename": filepath.name,
@@ -438,16 +449,18 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
             "file_size": file_stat.st_size,
             "duration": duration,
             "date_taken": meta.get("date_taken"),
-            "location": meta.get("location"),
+            "location": location,
             "camera": meta.get("camera"),
             "lens": meta.get("lens"),
             "iso": meta.get("iso"),
             "aperture": meta.get("aperture"),
             "shutter_speed": meta.get("shutter_speed"),
-            "gps_lat": meta.get("gps_lat"),
-            "gps_lng": meta.get("gps_lng"),
+            "gps_lat": gps_lat,
+            "gps_lng": gps_lng,
             "thumbnail_path": thumb_path,
             "file_hash": fhash,
             "phash": phash,
+            "country": geo.get("country"),
+            "city": geo.get("city"),
             "file_modified_at": datetime.fromtimestamp(file_stat.st_mtime).isoformat(),
         }
