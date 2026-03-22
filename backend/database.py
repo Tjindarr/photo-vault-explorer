@@ -463,10 +463,10 @@ def get_cleanup_data() -> dict:
         ) ORDER BY date_taken DESC"""
     ).fetchall()]
 
-    # Burst photos: filename patterns like IMG_1234 (1), IMG_1234_1, IMG_1234 2, etc.
-    # Group photos taken within 3 seconds of each other by the same camera
+    # Similar/burst photos: group photos taken within 3 seconds of each other
+    # by the SAME camera AND in the SAME folder (to avoid false matches)
     all_photos = [dict(r) for r in conn.execute(
-        "SELECT * FROM photos WHERE date_taken IS NOT NULL ORDER BY date_taken ASC"
+        "SELECT * FROM photos WHERE type='image' AND date_taken IS NOT NULL ORDER BY date_taken ASC"
     ).fetchall()]
 
     similar_groups = []
@@ -478,7 +478,12 @@ def get_cleanup_data() -> dict:
                 prev_dt = datetime.fromisoformat(all_photos[i-1]["date_taken"])
                 curr_dt = datetime.fromisoformat(all_photos[i]["date_taken"])
                 diff = abs((curr_dt - prev_dt).total_seconds())
-                if diff <= 5:
+                same_camera = (
+                    all_photos[i].get("camera") is not None
+                    and all_photos[i].get("camera") == all_photos[i-1].get("camera")
+                )
+                same_folder = all_photos[i]["folder"] == all_photos[i-1]["folder"]
+                if diff <= 3 and same_folder and same_camera:
                     current_group.append(all_photos[i])
                 else:
                     if len(current_group) >= 2:
