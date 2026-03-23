@@ -166,31 +166,16 @@ function AddToAlbumButton({ selectedIds, onComplete }: { selectedIds?: Set<strin
 }
 
 export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange, typeFilter, onTypeFilterChange, deleteMode, onDeleteModeChange, selectedCount = 0, selectedIds, onDeleteSelected, onReindexComplete, onAddToAlbumComplete }: AppHeaderProps) {
-  const { dark, toggle } = useTheme();
-  const { status: indexStatus, refresh } = useIndexStatus();
-  const [reindexing, setReindexing] = useState(false);
+  const { status: indexStatus } = useIndexStatus();
   const isMobile = useIsMobile();
   const wasRunningRef = useRef(false);
 
   useEffect(() => {
     if (wasRunningRef.current && !indexStatus.running) {
-      setReindexing(false);
       onReindexComplete?.();
     }
     wasRunningRef.current = indexStatus.running;
   }, [indexStatus.running, onReindexComplete]);
-
-  const handleReindex = async () => {
-    if (indexStatus.running || reindexing) return;
-    try {
-      setReindexing(true);
-      await triggerReindex();
-      await refresh();
-    } catch (error) {
-      console.error('Failed to trigger reindex:', error);
-      setReindexing(false);
-    }
-  };
 
   return (
     <header className="shrink-0 border-b border-border bg-surface">
@@ -272,60 +257,7 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
           </>
         )}
 
-        {isMobile && (
-          <div className="flex items-center gap-0.5 ml-1">
-            <button
-              onClick={() => onViewModeChange('cleanup')}
-              className={cn(
-                'p-2 rounded-md transition-colors active:scale-95',
-                viewMode === 'cleanup' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
-              )}
-              aria-label="Cleanup"
-            >
-              <Sparkles className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => onViewModeChange('trash')}
-              className={cn(
-                'p-2 rounded-md transition-colors active:scale-95',
-                viewMode === 'trash' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
-              )}
-              aria-label="Trash"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
         <div className="flex-1" />
-
-        <button
-          onClick={handleReindex}
-          disabled={indexStatus.running || reindexing}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium transition-colors active:scale-95',
-            indexStatus.running || reindexing
-              ? 'cursor-not-allowed bg-muted text-muted-foreground'
-              : 'bg-surface text-foreground hover:bg-secondary'
-          )}
-          aria-label="Reindex all files"
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', (indexStatus.running || reindexing) && 'animate-spin')} />
-          <span className="hidden sm:inline">Reindex</span>
-        </button>
-
-        <button
-          onClick={() => onViewModeChange('stats')}
-          className={cn(
-            'p-2 rounded-md transition-colors active:scale-95',
-            viewMode === 'stats'
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
-          )}
-          aria-label="Stats"
-        >
-          <BarChart3 className="h-4 w-4" />
-        </button>
 
         <div className="hidden lg:flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {views.map(({ mode, icon: Icon, label }) => (
@@ -345,13 +277,19 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
           ))}
         </div>
 
-        <button
-          onClick={toggle}
-          className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors active:scale-95"
-          aria-label="Toggle theme"
-        >
-          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
+        {/* Settings shortcut on mobile */}
+        {isMobile && (
+          <button
+            onClick={() => onViewModeChange('settings')}
+            className={cn(
+              'p-2 rounded-md transition-colors active:scale-95',
+              viewMode === 'settings' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
+            )}
+            aria-label="Settings"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {indexStatus.running && (
