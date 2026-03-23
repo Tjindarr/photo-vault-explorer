@@ -759,6 +759,7 @@ class CreateAlbumRequest(BaseModel):
 class UpdateAlbumRequest(BaseModel):
     name: str
     description: str = ""
+    cover_photo_id: Optional[str] = None
 
 class AlbumPhotosRequest(BaseModel):
     photo_ids: list[str]
@@ -772,15 +773,33 @@ def list_albums():
             {
                 "id": a["id"],
                 "name": a["name"],
-                "description": a["description"],
+                "description": a.get("description", ""),
                 "photoCount": a["photo_count"],
-                "coverUrl": f"/api/thumbnails/{a['cover_thumb'].split('/')[-1].replace('.webp','').replace('.jpg','')}" if a.get("cover_thumb") else None,
+                "coverUrl": _album_cover_url(a),
                 "createdAt": a["created_at"],
                 "updatedAt": a["updated_at"],
             }
             for a in albums
         ]
     }
+
+
+def _album_cover_url(a: dict) -> Optional[str]:
+    """Resolve album cover thumbnail URL: explicit cover_photo_id first, then latest photo."""
+    if a.get("cover_photo_id"):
+        photo = get_photo_by_id(a["cover_photo_id"])
+        if photo and photo.get("thumbnail_path"):
+            return f"/api/thumbnails/{photo['id']}"
+    if a.get("cover_thumb"):
+        # Fallback: latest photo thumbnail
+        try:
+            thumb = a["cover_thumb"]
+            # Extract photo id from thumbnail path
+            base = os.path.splitext(os.path.basename(thumb))[0]
+            return f"/api/thumbnails/{base}"
+        except Exception:
+            pass
+    return None
 
 
 @app.post("/api/albums")
@@ -796,7 +815,7 @@ def update_album_endpoint(album_id: str, req: UpdateAlbumRequest):
     album = get_album_by_id(album_id)
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
-    update_album(album_id, req.name, req.description)
+    update_album(album_id, req.name, req.description, req.cover_photo_id)
     return {"ok": True}
 
 
