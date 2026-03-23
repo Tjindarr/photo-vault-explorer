@@ -144,6 +144,7 @@ function PhotoThumbnail({ photo, onSelect, deleteMode, selected, onToggleSelect 
 export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLoadMore, deleteMode, selectedIds, onToggleSelect }: PhotoGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(4);
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
 
   // Measure container width and compute columns
   const updateCols = useCallback(() => {
@@ -199,6 +200,25 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
   }, [hasMore, loadingMore, onLoadMore]);
+
+  // Track which date header is currently visible
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const items = virtualizer.getVirtualItems();
+      for (const item of items) {
+        const row = rows[item.index];
+        if (row?.type === 'header') {
+          setActiveLabel(row.label);
+          break;
+        }
+      }
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [rows, virtualizer]);
+
   // Scroll to a date header by label
   const handleScrollToDate = useCallback((label: string) => {
     const idx = rows.findIndex(r => r.type === 'header' && r.label === label);
@@ -222,7 +242,7 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
 
   return (
     <div className="h-full flex flex-col relative">
-      <TimelineScrubber photos={photos} onScrollToDate={handleScrollToDate} />
+      <TimelineScrubber photos={photos} onScrollToDate={handleScrollToDate} activeLabel={activeLabel} />
       <div ref={containerRef} className="flex-1 overflow-y-auto scrollbar-thin min-h-0 pr-14 sm:pr-16">
       <div
         style={{
