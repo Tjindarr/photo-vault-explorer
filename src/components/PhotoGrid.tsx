@@ -200,6 +200,25 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
   }, [hasMore, loadingMore, onLoadMore]);
+
+  // Track which date header is currently visible
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const items = virtualizer.getVirtualItems();
+      for (const item of items) {
+        const row = rows[item.index];
+        if (row?.type === 'header') {
+          setActiveLabel(row.label);
+          break;
+        }
+      }
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [rows, virtualizer]);
+
   // Scroll to a date header by label
   const handleScrollToDate = useCallback((label: string) => {
     const idx = rows.findIndex(r => r.type === 'header' && r.label === label);
