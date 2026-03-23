@@ -1,10 +1,11 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { Photo } from '@/lib/mock-data';
 
 interface TimelineScrubberProps {
   photos: Photo[];
   onScrollToDate: (label: string) => void;
+  activeLabel?: string | null;
 }
 
 interface YearGroup {
@@ -14,7 +15,7 @@ interface YearGroup {
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScrubberProps) {
+export default function TimelineScrubber({ photos, onScrollToDate, activeLabel }: TimelineScrubberProps) {
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const scrubberRef = useRef<HTMLDivElement>(null);
@@ -55,7 +56,6 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
     return groups;
   }, [photos]);
 
-  // All labels in order for drag scrubbing
   const allLabels = useMemo(() => {
     const labels: string[] = [];
     for (const g of yearGroups) {
@@ -98,9 +98,13 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
 
   if (yearGroups.length === 0) return null;
 
-  // Compact mode: only show years if many entries
   const totalMonths = allLabels.length;
   const compact = totalMonths > 24;
+
+  // Determine which year the active label belongs to
+  const activeYear = activeLabel
+    ? activeLabel.split(' ').pop() || null
+    : null;
 
   return (
     <div
@@ -125,11 +129,15 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
         </div>
       )}
 
-      {/* Year/month ticks */}
       {yearGroups.map((g) => (
-        <div key={g.year} className="flex flex-col items-center gap-0.5">
+        <div key={g.year} className="flex flex-col items-center gap-0.5 relative">
+          {/* Active indicator dot */}
+          {activeYear === g.year && (
+            <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary shadow-sm shadow-primary/50 transition-all" />
+          )}
           <span className={cn(
-            "text-[11px] font-bold text-foreground tabular-nums cursor-pointer hover:text-primary transition-colors",
+            "text-[11px] font-bold tabular-nums cursor-pointer transition-colors",
+            activeYear === g.year ? "text-primary" : "text-foreground hover:text-primary",
             hoveredLabel && g.months.some(m => m.label === hoveredLabel) && "text-primary",
           )}>
             {g.year}
@@ -138,11 +146,17 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
             <button
               key={m.label}
               className={cn(
-                "text-[9px] text-muted-foreground hover:text-primary transition-colors leading-tight cursor-pointer",
+                "text-[9px] transition-colors leading-tight cursor-pointer relative",
+                activeLabel === m.label
+                  ? "text-primary font-bold"
+                  : "text-muted-foreground hover:text-primary",
                 hoveredLabel === m.label && "text-primary font-semibold",
               )}
               onClick={() => onScrollToDate(m.label)}
             >
+              {activeLabel === m.label && (
+                <span className="absolute -left-2.5 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-primary" />
+              )}
               {m.month}
             </button>
           ))}
