@@ -242,7 +242,7 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
 
   return (
     <div className="h-full flex flex-col relative">
-      <TimelineScrubber photos={photos} onScrollToDate={handleScrollToDate} />
+      <TimelineScrubber photos={photos} onScrollToDate={handleScrollToDate} activeLabel={activeLabel} />
       <div ref={containerRef} className="flex-1 overflow-y-auto scrollbar-thin min-h-0 pr-14 sm:pr-16">
       <div
         style={{
