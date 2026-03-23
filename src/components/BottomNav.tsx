@@ -1,4 +1,4 @@
-import { LayoutGrid, Map, Trash2, Sparkles } from 'lucide-react';
+import { LayoutGrid, Map, Trash2, Sparkles, FolderHeart, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ViewMode } from '@/components/AppHeader';
 
@@ -10,6 +10,8 @@ interface BottomNavProps {
 const tabs: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
   { mode: 'grid', icon: LayoutGrid, label: 'Library' },
   { mode: 'map', icon: Map, label: 'Map' },
+  { mode: 'albums', icon: FolderHeart, label: 'Albums' },
+  { mode: 'recent', icon: Clock, label: 'Recent' },
   { mode: 'cleanup', icon: Sparkles, label: 'Cleanup' },
   { mode: 'trash', icon: Trash2, label: 'Trash' },
 ];
