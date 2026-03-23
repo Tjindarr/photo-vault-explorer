@@ -199,6 +199,13 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
   }, [hasMore, loadingMore, onLoadMore]);
+  // Scroll to a date header by label
+  const handleScrollToDate = useCallback((label: string) => {
+    const idx = rows.findIndex(r => r.type === 'header' && r.label === label);
+    if (idx >= 0) {
+      virtualizer.scrollToIndex(idx, { align: 'start' });
+    }
+  }, [rows, virtualizer]);
 
   if (photos.length === 0) {
     return (
@@ -212,13 +219,6 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
     );
   }
 
-  // Scroll to a date header by label
-  const handleScrollToDate = useCallback((label: string) => {
-    const idx = rows.findIndex(r => r.type === 'header' && r.label === label);
-    if (idx >= 0) {
-      virtualizer.scrollToIndex(idx, { align: 'start' });
-    }
-  }, [rows, virtualizer]);
 
   return (
     <div className="h-full flex flex-col relative">
