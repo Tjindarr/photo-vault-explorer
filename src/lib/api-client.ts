@@ -290,11 +290,11 @@ export async function createAlbum(name: string, description = ''): Promise<{ id:
   });
 }
 
-export async function updateAlbum(albumId: string, name: string, description = ''): Promise<void> {
+export async function updateAlbum(albumId: string, name: string, description = '', coverPhotoId?: string): Promise<void> {
   await fetchJson(`${API_BASE}/albums/${albumId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, description }),
+    body: JSON.stringify({ name, description, cover_photo_id: coverPhotoId || undefined }),
   });
 }
 

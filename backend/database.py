@@ -706,12 +706,18 @@ def get_album_by_id(album_id: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
-def update_album(album_id: str, name: str, description: str = ""):
+def update_album(album_id: str, name: str, description: str = "", cover_photo_id: str = None):
     conn = get_db()
-    conn.execute(
-        "UPDATE albums SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ?",
-        (name, description, album_id),
-    )
+    if cover_photo_id is not None:
+        conn.execute(
+            "UPDATE albums SET name = ?, description = ?, cover_photo_id = ?, updated_at = datetime('now') WHERE id = ?",
+            (name, description, cover_photo_id, album_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE albums SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ?",
+            (name, description, album_id),
+        )
     conn.commit()
     conn.close()
 
