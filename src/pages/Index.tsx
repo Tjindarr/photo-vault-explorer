@@ -173,8 +173,13 @@ export default function Index() {
           if (!on) setSelectedIds(new Set());
         }}
         selectedCount={selectedIds.size}
+        selectedIds={selectedIds}
         onDeleteSelected={handleDeleteSelected}
         onReindexComplete={loadPhotos}
+        onAddToAlbumComplete={() => {
+          setDeleteMode(false);
+          setSelectedIds(new Set());
+        }}
       />
       <div className="flex flex-1 min-h-0">
         <FolderSidebar
