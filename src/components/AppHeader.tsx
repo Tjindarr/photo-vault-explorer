@@ -79,8 +79,93 @@ function useIndexStatus() {
 
   return { status, refresh: poll };
 }
+function AddToAlbumButton({ selectedIds, onComplete }: { selectedIds?: Set<string>; onComplete?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
 
-export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange, typeFilter, onTypeFilterChange, deleteMode, onDeleteModeChange, selectedCount = 0, selectedIds, onDeleteSelected, onReindexComplete, onAddToAlbumComplete }: AppHeaderProps) {
+  useEffect(() => {
+    if (open) {
+      setLoading(true);
+      fetchAlbums().then(res => setAlbums(res.items)).finally(() => setLoading(false));
+    }
+  }, [open]);
+
+  const handleAdd = async (albumId: string, albumName: string) => {
+    if (!selectedIds?.size) return;
+    try {
+      await addPhotosToAlbum(albumId, Array.from(selectedIds));
+      toast.success(`Added ${selectedIds.size} photo(s) to "${albumName}"`);
+      setOpen(false);
+      onComplete?.();
+    } catch { toast.error('Failed to add to album'); }
+  };
+
+  const handleCreateAndAdd = async () => {
+    if (!newName.trim() || !selectedIds?.size) return;
+    setCreating(true);
+    try {
+      const res = await createAlbum(newName.trim());
+      await addPhotosToAlbum(res.id, Array.from(selectedIds));
+      toast.success(`Created "${newName.trim()}" and added ${selectedIds.size} photo(s)`);
+      setNewName('');
+      setOpen(false);
+      onComplete?.();
+    } catch { toast.error('Failed to create album'); }
+    finally { setCreating(false); }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium active:scale-95">
+          <FolderPlus className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Album</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2" align="start">
+        <p className="text-xs font-medium text-foreground px-2 py-1">Add to album</p>
+        {loading ? (
+          <div className="flex justify-center py-3">
+            <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/20 border-t-primary animate-spin" />
+          </div>
+        ) : (
+          <div className="max-h-40 overflow-y-auto scrollbar-thin">
+            {albums.map(album => (
+              <button
+                key={album.id}
+                onClick={() => handleAdd(album.id, album.name)}
+                className="w-full text-left px-2 py-1.5 rounded-md text-xs hover:bg-secondary transition-colors flex items-center justify-between"
+              >
+                <span className="truncate text-foreground">{album.name}</span>
+                <span className="text-[10px] text-muted-foreground ml-2">{album.photoCount}</span>
+              </button>
+            ))}
+            {albums.length === 0 && (
+              <p className="text-[10px] text-muted-foreground px-2 py-1">No albums yet</p>
+            )}
+          </div>
+        )}
+        <div className="border-t border-border mt-1 pt-1.5 flex gap-1">
+          <Input
+            placeholder="New album…"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleCreateAndAdd()}
+            className="h-7 text-xs"
+          />
+          <Button size="sm" className="h-7 px-2 text-xs" onClick={handleCreateAndAdd} disabled={!newName.trim() || creating}>
+            +
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+
   const { dark, toggle } = useTheme();
   const { status: indexStatus, refresh } = useIndexStatus();
   const [reindexing, setReindexing] = useState(false);
