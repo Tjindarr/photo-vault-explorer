@@ -21,28 +21,36 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
 
   const yearGroups = useMemo(() => {
     const map = new Map<string, Map<number, number>>();
+    let minYear = Infinity, maxYear = -Infinity;
     for (const p of photos) {
       const d = p.metadata.dateTaken ? new Date(p.metadata.dateTaken) : null;
       if (!d) continue;
-      const year = d.getFullYear().toString();
-      if (!map.has(year)) map.set(year, new Map());
-      const monthMap = map.get(year)!;
+      const year = d.getFullYear();
+      if (year < minYear) minYear = year;
+      if (year > maxYear) maxYear = year;
+      const ys = year.toString();
+      if (!map.has(ys)) map.set(ys, new Map());
+      const monthMap = map.get(ys)!;
       const m = d.getMonth();
       monthMap.set(m, (monthMap.get(m) || 0) + 1);
     }
 
+    if (minYear === Infinity) return [];
+
     const groups: YearGroup[] = [];
-    const sortedYears = Array.from(map.keys()).sort((a, b) => b.localeCompare(a));
-    for (const year of sortedYears) {
-      const monthMap = map.get(year)!;
-      const months = Array.from(monthMap.entries())
-        .sort((a, b) => b[0] - a[0])
-        .map(([m, count]) => {
-          const date = new Date(parseInt(year), m, 1);
-          const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-          return { month: MONTH_NAMES[m], label, count };
-        });
-      groups.push({ year, months });
+    for (let y = maxYear; y >= minYear; y--) {
+      const ys = y.toString();
+      const monthMap = map.get(ys);
+      const months = monthMap
+        ? Array.from(monthMap.entries())
+            .sort((a, b) => b[0] - a[0])
+            .map(([m, count]) => {
+              const date = new Date(y, m, 1);
+              const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+              return { month: MONTH_NAMES[m], label, count };
+            })
+        : [];
+      groups.push({ year: ys, months });
     }
     return groups;
   }, [photos]);
