@@ -12,6 +12,7 @@ import CleanupView from '@/components/CleanupView';
 import TrashView from '@/components/TrashView';
 import AlbumsView from '@/components/AlbumsView';
 import RecentView from '@/components/RecentView';
+import SettingsView from '@/components/SettingsView';
 import PhotoViewer from '@/components/PhotoViewer';
 import { type Photo, type Folder } from '@/lib/mock-data';
 import { fetchPhotos, fetchFolders, fetchMapPhotos, fetchStats, deletePhotos, isApiAvailable } from '@/lib/api-client';
@@ -239,6 +240,8 @@ export default function Index() {
               <AlbumsView onSelectPhoto={setSelectedPhoto} />
             ) : viewMode === 'recent' ? (
               <RecentView onSelectPhoto={setSelectedPhoto} />
+            ) : viewMode === 'settings' ? (
+              <SettingsView onSelectPhoto={setSelectedPhoto} />
             ) : (
               <StatsDashboard stats={stats} />
             )}

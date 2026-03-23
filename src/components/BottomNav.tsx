@@ -1,4 +1,4 @@
-import { LayoutGrid, Map, Trash2, Sparkles, FolderHeart, Clock } from 'lucide-react';
+import { LayoutGrid, Map, FolderHeart, Clock, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ViewMode } from '@/components/AppHeader';
 
@@ -12,6 +12,7 @@ const tabs: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
   { mode: 'map', icon: Map, label: 'Map' },
   { mode: 'albums', icon: FolderHeart, label: 'Albums' },
   { mode: 'recent', icon: Clock, label: 'Recent' },
+  { mode: 'settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function BottomNav({ viewMode, onViewModeChange }: BottomNavProps) {
