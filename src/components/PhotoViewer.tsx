@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
-import { X, MapPin, Camera, Clock, Maximize2, Trash2, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { X, MapPin, Camera, Clock, Maximize2, Trash2, ChevronLeft, ChevronRight, Info, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useImageZoom } from '@/hooks/use-image-zoom';
 import type { Photo } from '@/lib/mock-data';
 
 interface PhotoViewerProps {
@@ -36,7 +37,9 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
   const [showInfo, setShowInfo] = useState(false);
   const thumbStripRef = useRef<HTMLDivElement>(null);
 
-  // Touch/swipe state
+  const { containerRef, zoom, isZoomed, resetZoom, imageStyle, handlers: zoomHandlers } = useImageZoom();
+
+  // Touch/swipe state (only when not zoomed)
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [swipeY, setSwipeY] = useState(0);
@@ -59,7 +62,8 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
     setSwipeOffset(0);
     setSwipeY(0);
     swipeDirection.current = null;
-  }, [photo.id]);
+    resetZoom();
+  }, [photo.id, resetZoom]);
 
   // Scroll thumbnail strip to center current photo
   useEffect(() => {
@@ -73,27 +77,31 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft') goPrev();
-      if (e.key === 'ArrowRight') goNext();
+      if (e.key === 'Escape') {
+        if (isZoomed) { resetZoom(); } else { onClose(); }
+      }
+      if (!isZoomed) {
+        if (e.key === 'ArrowLeft') goPrev();
+        if (e.key === 'ArrowRight') goNext();
+      }
       if (e.key === 'i') setShowInfo((s) => !s);
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose, goPrev, goNext]);
+  }, [onClose, goPrev, goNext, isZoomed, resetZoom]);
 
-  // Touch handlers for swipe (horizontal nav + vertical dismiss)
+  // Touch handlers for swipe — only when NOT zoomed
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isZoomed || e.touches.length > 1) return;
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     swipeDirection.current = null;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!touchStart.current) return;
+    if (isZoomed || !touchStart.current || e.touches.length > 1) return;
     const dx = e.touches[0].clientX - touchStart.current.x;
     const dy = e.touches[0].clientY - touchStart.current.y;
 
-    // Determine direction on first significant movement
     if (!swipeDirection.current) {
       if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
         swipeDirection.current = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal';
@@ -104,12 +112,12 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
     if (swipeDirection.current === 'horizontal') {
       setSwipeOffset(dx);
     } else {
-      // Only allow downward swipe to dismiss
       setSwipeY(Math.max(0, dy));
     }
   };
 
   const handleTouchEnd = () => {
+    if (isZoomed) return;
     if (swipeDirection.current === 'horizontal') {
       if (swipeOffset < -SWIPE_THRESHOLD && hasNext) goNext();
       else if (swipeOffset > SWIPE_THRESHOLD && hasPrev) goPrev();
@@ -124,22 +132,20 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
 
   const meta = photo.metadata;
 
-  // Thumbnail strip: show nearby photos
   const THUMB_RANGE = 12;
   const thumbStart = Math.max(0, currentIndex - THUMB_RANGE);
   const thumbEnd = Math.min(photos.length, currentIndex + THUMB_RANGE + 1);
   const nearbyPhotos = photos.slice(thumbStart, thumbEnd);
 
-  // Dismiss opacity based on swipe
   const dismissProgress = Math.min(swipeY / (SWIPE_DOWN_THRESHOLD * 2), 1);
+
+  const zoomPercent = Math.round(zoom.scale * 100);
 
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col bg-overlay/95 backdrop-blur-sm fade-in"
-      style={{
-        opacity: 1 - dismissProgress * 0.5,
-      }}
-      onClick={onClose}
+      style={{ opacity: 1 - dismissProgress * 0.5 }}
+      onClick={isZoomed ? undefined : onClose}
     >
       {/* Top bar */}
       <div
@@ -147,22 +153,30 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
         style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Left: close button */}
         <button
-          onClick={onClose}
+          onClick={isZoomed ? resetZoom : onClose}
           className="p-2.5 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
-          aria-label="Close"
+          aria-label={isZoomed ? 'Reset zoom' : 'Close'}
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
 
-        {/* Center: counter */}
+        {/* Center: counter or zoom level */}
         <span className="text-white/60 text-xs tabular-nums">
-          {currentIndex + 1} / {photos.length}
+          {isZoomed ? `${zoomPercent}%` : `${currentIndex + 1} / ${photos.length}`}
         </span>
 
-        {/* Right: actions */}
         <div className="flex items-center gap-0.5">
+          {/* Zoom controls (desktop) */}
+          {isZoomed && (
+            <button
+              onClick={resetZoom}
+              className="hidden sm:flex p-2.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors active:scale-95"
+              aria-label="Reset zoom"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          )}
           {onDelete && (
             <button
               onClick={() => onDelete(photo)}
@@ -185,16 +199,16 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
         </div>
       </div>
 
-      {/* Main content area with swipe */}
+      {/* Main content area */}
       <div
         className="flex-1 flex min-h-0 relative"
         onClick={(e) => e.stopPropagation()}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchStart={(e) => { handleTouchStart(e); zoomHandlers.onTouchStart(e); }}
+        onTouchMove={(e) => { handleTouchMove(e); zoomHandlers.onTouchMove(e); }}
+        onTouchEnd={() => { handleTouchEnd(); zoomHandlers.onTouchEnd(); }}
       >
-        {/* Desktop prev/next buttons */}
-        {hasPrev && (
+        {/* Desktop prev/next buttons — hidden when zoomed */}
+        {hasPrev && !isZoomed && (
           <button
             onClick={goPrev}
             className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/40 text-white/80 hover:bg-black/60 hover:text-white transition-all active:scale-95"
@@ -203,7 +217,7 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
             <ChevronLeft className="h-5 w-5" />
           </button>
         )}
-        {hasNext && (
+        {hasNext && !isZoomed && (
           <button
             onClick={goNext}
             className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full bg-black/40 text-white/80 hover:bg-black/60 hover:text-white transition-all active:scale-95"
@@ -215,15 +229,25 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
 
         {/* Image or Video */}
         <div
-          className={cn('flex-1 flex items-center justify-center p-2 sm:p-12 transition-all duration-300', showInfo && 'lg:mr-72')}
+          ref={containerRef}
+          className={cn(
+            'flex-1 flex items-center justify-center p-2 sm:p-12 transition-all duration-300 overflow-hidden',
+            showInfo && 'lg:mr-72',
+          )}
           style={{
-            transform: swipeDirection.current === 'horizontal' && swipeOffset
+            transform: !isZoomed && swipeDirection.current === 'horizontal' && swipeOffset
               ? `translateX(${swipeOffset * 0.4}px)`
-              : swipeDirection.current === 'vertical' && swipeY
+              : !isZoomed && swipeDirection.current === 'vertical' && swipeY
               ? `translateY(${swipeY * 0.6}px) scale(${1 - dismissProgress * 0.1})`
               : undefined,
             transition: (swipeOffset || swipeY) ? 'none' : 'transform 0.3s ease',
           }}
+          onWheel={photo.type !== 'video' ? zoomHandlers.onWheel : undefined}
+          onDoubleClick={photo.type !== 'video' ? zoomHandlers.onDoubleClick : undefined}
+          onMouseDown={photo.type !== 'video' ? zoomHandlers.onMouseDown : undefined}
+          onMouseMove={photo.type !== 'video' ? zoomHandlers.onMouseMove : undefined}
+          onMouseUp={photo.type !== 'video' ? zoomHandlers.onMouseUp : undefined}
+          onMouseLeave={photo.type !== 'video' ? zoomHandlers.onMouseLeave : undefined}
         >
           {photo.type === 'video' ? (
             <video
@@ -245,9 +269,10 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
               alt={photo.filename}
               onLoad={() => setLoaded(true)}
               className={cn(
-                'max-w-full max-h-full object-contain rounded-sm transition-all duration-500 select-none',
-                loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.97]',
+                'max-w-full max-h-full object-contain rounded-sm select-none',
+                loaded ? 'opacity-100' : 'opacity-0',
               )}
+              style={imageStyle}
               draggable={false}
             />
           )}
@@ -377,7 +402,7 @@ export default function PhotoViewer({ photo, photos, onClose, onNavigate, onDele
         )}
       </div>
 
-      {/* Thumbnail strip at bottom — desktop only */}
+      {/* Thumbnail strip at bottom */}
       <div
         className="shrink-0 bg-overlay/80 backdrop-blur-sm border-t border-white/10 py-1.5 sm:py-2 px-1 sm:px-2"
         onClick={(e) => e.stopPropagation()}
