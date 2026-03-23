@@ -479,8 +479,8 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None, geoc
             thumb_path = generate_video_thumbnail(str(filepath), photo_id)
             duration = get_video_duration(str(filepath))
         else:
-            thumb_path = generate_thumbnail(str(filepath), photo_id)
-            phash = compute_phash(str(filepath))
+            # Single image open for both thumbnail and pHash
+            thumb_path, phash = generate_thumbnail_and_phash(str(filepath), photo_id)
 
         # Reverse geocode GPS coordinates
         geo = {"country": None, "city": None, "location_name": None}

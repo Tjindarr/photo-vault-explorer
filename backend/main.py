@@ -4,6 +4,7 @@ import time
 import logging
 import threading
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 from contextlib import asynccontextmanager
 
@@ -13,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import (
-    init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id,
+    init_db, upsert_photo, upsert_photos_batch, search_photos, get_folder_tree, get_photo_by_id,
     get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths,
     get_map_photos, get_map_clusters, get_map_countries, get_map_cities,
     get_duplicate_photos, delete_photos_by_ids,
