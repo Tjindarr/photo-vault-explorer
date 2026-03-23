@@ -21,6 +21,15 @@ import { toast } from 'sonner';
 const PAGE_SIZE = 500;
 
 export default function Index() {
+  // Initialize theme on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('imgvault-theme');
+    if (saved === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
