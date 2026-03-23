@@ -265,4 +265,68 @@ export async function fetchCleanup(): Promise<{
   return fetchJson(`${API_BASE}/cleanup`);
 }
 
+// ── Albums ────────────────────────────────────────────────────────
+
+export interface Album {
+  id: string;
+  name: string;
+  description: string;
+  photoCount: number;
+  coverUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchAlbums(): Promise<{ items: Album[] }> {
+  if (!(await isApiAvailable())) return { items: [] };
+  return fetchJson(`${API_BASE}/albums`);
+}
+
+export async function createAlbum(name: string, description = ''): Promise<{ id: string; name: string }> {
+  return fetchJson(`${API_BASE}/albums`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description }),
+  });
+}
+
+export async function updateAlbum(albumId: string, name: string, description = ''): Promise<void> {
+  await fetchJson(`${API_BASE}/albums/${albumId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description }),
+  });
+}
+
+export async function deleteAlbum(albumId: string): Promise<void> {
+  await fetchJson(`${API_BASE}/albums/${albumId}`, { method: 'DELETE' });
+}
+
+export async function fetchAlbumPhotos(albumId: string, limit = 500, offset = 0): Promise<{ items: Photo[]; total: number }> {
+  return fetchJson(`${API_BASE}/albums/${albumId}/photos?limit=${limit}&offset=${offset}`);
+}
+
+export async function addPhotosToAlbum(albumId: string, photoIds: string[]): Promise<void> {
+  await fetchJson(`${API_BASE}/albums/${albumId}/photos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photo_ids: photoIds }),
+  });
+}
+
+export async function removePhotosFromAlbum(albumId: string, photoIds: string[]): Promise<void> {
+  await fetchJson(`${API_BASE}/albums/${albumId}/photos/remove`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photo_ids: photoIds }),
+  });
+}
+
+// ── Recently added ────────────────────────────────────────────────
+
+export async function fetchRecentPhotos(limit = 200): Promise<{ items: Photo[]; total: number }> {
+  if (!(await isApiAvailable())) return { items: [], total: 0 };
+  return fetchJson(`${API_BASE}/recent?limit=${limit}`);
+}
+
 export { isApiAvailable };
