@@ -144,6 +144,7 @@ function PhotoThumbnail({ photo, onSelect, deleteMode, selected, onToggleSelect 
 export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLoadMore, deleteMode, selectedIds, onToggleSelect }: PhotoGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(4);
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
 
   // Measure container width and compute columns
   const updateCols = useCallback(() => {
