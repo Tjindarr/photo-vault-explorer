@@ -1,14 +1,14 @@
-import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw, Trash2, ImageIcon, Film, Pencil, Sparkles, FolderHeart, Clock, FolderPlus } from 'lucide-react';
+import { Camera, PanelLeft, LayoutGrid, Map, Sun, Moon, Loader2, Trash2, ImageIcon, Film, Pencil, FolderHeart, Clock, FolderPlus, Settings } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { fetchIndexStatus, triggerReindex, fetchAlbums, addPhotosToAlbum, createAlbum, type Album } from '@/lib/api-client';
+import { fetchIndexStatus, fetchAlbums, addPhotosToAlbum, createAlbum, type Album } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-export type ViewMode = 'grid' | 'map' | 'stats' | 'trash' | 'cleanup' | 'albums' | 'recent';
+export type ViewMode = 'grid' | 'map' | 'stats' | 'trash' | 'cleanup' | 'albums' | 'recent' | 'settings';
 
 interface AppHeaderProps {
   onToggleSidebar: () => void;
@@ -30,8 +30,7 @@ const views: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
   { mode: 'map', icon: Map, label: 'Map view' },
   { mode: 'albums', icon: FolderHeart, label: 'Albums' },
   { mode: 'recent', icon: Clock, label: 'Recent' },
-  { mode: 'cleanup', icon: Sparkles, label: 'Cleanup' },
-  { mode: 'trash', icon: Trash2, label: 'Trash' },
+  { mode: 'settings', icon: Settings, label: 'Settings' },
 ];
 
 function useTheme() {
