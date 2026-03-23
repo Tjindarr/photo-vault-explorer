@@ -152,7 +152,7 @@ export default function TimelineScrubber({ photos, onScrollToDate, activeLabel }
             "absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 transition-all",
             isDragging ? "duration-0" : "duration-200",
           )}
-          style={{ top: `calc(12px + ${activeRatio * 100}% * (1 - 24px / 100%))`, top: `calc(12px + ${activeRatio} * (100% - 24px))` }}
+          style={{ top: `calc(12px + ${activeRatio} * (100% - 24px))` }}
         >
           <div className={cn(
             "w-3 h-3 rounded-full bg-primary border-2 border-primary-foreground shadow-md",
