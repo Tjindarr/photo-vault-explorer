@@ -98,10 +98,10 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
     <div
       ref={scrubberRef}
       className={cn(
-        "absolute right-0 top-0 bottom-0 z-20 flex flex-col items-end justify-between",
-        "select-none touch-none py-2",
-        "w-14 sm:w-16",
-        "bg-card/80 backdrop-blur-sm border-l border-border/50 rounded-l-lg",
+        "absolute right-0 top-0 bottom-0 z-20 flex flex-col items-center justify-between",
+        "select-none touch-none py-3",
+        "w-12 sm:w-14",
+        "bg-card/80 backdrop-blur-sm border-l border-border/50",
       )}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -110,7 +110,7 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
     >
       {/* Floating tooltip */}
       {isDragging && hoveredLabel && (
-        <div className="fixed right-20 sm:right-24 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
+        <div className="fixed right-16 sm:right-20 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
           <div className="bg-primary text-primary-foreground text-sm font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
             {hoveredLabel}
           </div>
@@ -118,40 +118,28 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
       )}
 
       {/* Year/month ticks */}
-      {compact ? (
-        yearGroups.map((g) => (
-          <button
-            key={g.year}
-            className={cn(
-              "text-[11px] font-semibold tabular-nums text-muted-foreground hover:text-primary transition-colors",
-              "px-2 py-0.5 rounded",
-              hoveredLabel && g.months.some(m => m.label === hoveredLabel) && "text-primary font-bold bg-primary/10",
-            )}
-            onClick={() => onScrollToDate(g.months[0].label)}
-          >
-            {g.year.slice(2)}
-          </button>
-        ))
-      ) : (
-        yearGroups.map((g) => (
-          <div key={g.year} className="flex flex-col items-end gap-px">
-            <span className="text-[10px] font-bold text-foreground pr-2">{g.year.slice(2)}</span>
-            {g.months.map((m) => (
-              <button
-                key={m.label}
-                className={cn(
-                  "text-[9px] text-muted-foreground hover:text-primary transition-colors",
-                  "pr-2 leading-tight",
-                  hoveredLabel === m.label && "text-primary font-semibold",
-                )}
-                onClick={() => onScrollToDate(m.label)}
-              >
-                {m.month}
-              </button>
-            ))}
-          </div>
-        ))
-      )}
+      {yearGroups.map((g) => (
+        <div key={g.year} className="flex flex-col items-center gap-0.5">
+          <span className={cn(
+            "text-[11px] font-bold text-foreground tabular-nums cursor-pointer hover:text-primary transition-colors",
+            hoveredLabel && g.months.some(m => m.label === hoveredLabel) && "text-primary",
+          )}>
+            {g.year}
+          </span>
+          {!compact && g.months.map((m) => (
+            <button
+              key={m.label}
+              className={cn(
+                "text-[9px] text-muted-foreground hover:text-primary transition-colors leading-tight cursor-pointer",
+                hoveredLabel === m.label && "text-primary font-semibold",
+              )}
+              onClick={() => onScrollToDate(m.label)}
+            >
+              {m.month}
+            </button>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
