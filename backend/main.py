@@ -19,6 +19,8 @@ from database import (
     get_duplicate_photos, delete_photos_by_ids,
     add_to_trash, get_trash_items, get_trash_item_by_id, remove_from_trash, purge_expired_trash,
     get_cleanup_data,
+    create_album, get_albums, get_album_by_id, update_album, delete_album,
+    add_photos_to_album, remove_photos_from_album, get_album_photos, get_recent_photos,
 )
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 
@@ -746,3 +748,101 @@ def cleanup_suggestions():
 @app.get("/api/health")
 def health():
     return {"status": "ok", "photos_dir": PHOTOS_DIR}
+
+
+# ── Album endpoints ──────────────────────────────────────────────
+
+class CreateAlbumRequest(BaseModel):
+    name: str
+    description: str = ""
+
+class UpdateAlbumRequest(BaseModel):
+    name: str
+    description: str = ""
+
+class AlbumPhotosRequest(BaseModel):
+    photo_ids: list[str]
+
+
+@app.get("/api/albums")
+def list_albums():
+    albums = get_albums()
+    return {
+        "items": [
+            {
+                "id": a["id"],
+                "name": a["name"],
+                "description": a["description"],
+                "photoCount": a["photo_count"],
+                "coverUrl": f"/api/thumbnails/{a['cover_thumb'].split('/')[-1].replace('.webp','').replace('.jpg','')}" if a.get("cover_thumb") else None,
+                "createdAt": a["created_at"],
+                "updatedAt": a["updated_at"],
+            }
+            for a in albums
+        ]
+    }
+
+
+@app.post("/api/albums")
+def create_album_endpoint(req: CreateAlbumRequest):
+    import uuid
+    album_id = str(uuid.uuid4())[:8]
+    album = create_album(album_id, req.name, req.description)
+    return {"id": album["id"], "name": album["name"]}
+
+
+@app.put("/api/albums/{album_id}")
+def update_album_endpoint(album_id: str, req: UpdateAlbumRequest):
+    album = get_album_by_id(album_id)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    update_album(album_id, req.name, req.description)
+    return {"ok": True}
+
+
+@app.delete("/api/albums/{album_id}")
+def delete_album_endpoint(album_id: str):
+    album = get_album_by_id(album_id)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    delete_album(album_id)
+    return {"ok": True}
+
+
+@app.get("/api/albums/{album_id}/photos")
+def list_album_photos(
+    album_id: str,
+    limit: int = Query(500, ge=1, le=50000),
+    offset: int = Query(0, ge=0),
+):
+    album = get_album_by_id(album_id)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    photos, total = get_album_photos(album_id, limit=limit, offset=offset)
+    return {"items": [_format_photo(p) for p in photos], "total": total}
+
+
+@app.post("/api/albums/{album_id}/photos")
+def add_to_album(album_id: str, req: AlbumPhotosRequest):
+    album = get_album_by_id(album_id)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    add_photos_to_album(album_id, req.photo_ids)
+    return {"ok": True, "added": len(req.photo_ids)}
+
+
+@app.post("/api/albums/{album_id}/photos/remove")
+def remove_from_album(album_id: str, req: AlbumPhotosRequest):
+    album = get_album_by_id(album_id)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    remove_photos_from_album(album_id, req.photo_ids)
+    return {"ok": True, "removed": len(req.photo_ids)}
+
+
+# ── Recently added endpoint ───────────────────────────────────────
+
+@app.get("/api/recent")
+def list_recent(limit: int = Query(200, ge=1, le=5000)):
+    photos, total = get_recent_photos(limit=limit)
+    return {"items": [_format_photo(p) for p in photos], "total": total}

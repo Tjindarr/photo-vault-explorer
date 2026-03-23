@@ -93,6 +93,30 @@ def init_db():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_phash ON photos(phash)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_country ON photos(country)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_city ON photos(city)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_indexed_at ON photos(indexed_at)")
+
+    # Albums tables
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS albums (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            cover_photo_id TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS album_photos (
+            album_id TEXT NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+            photo_id TEXT NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+            added_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (album_id, photo_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_album_photos_album ON album_photos(album_id);
+        CREATE INDEX IF NOT EXISTS idx_album_photos_photo ON album_photos(photo_id);
+    """)
+
     conn.commit()
     conn.close()
 
@@ -642,3 +666,109 @@ def get_cleanup_data() -> dict:
         "similarGroups": similar_groups,
         "duplicateGroups": duplicate_groups,
     }
+
+
+# ── Album operations ──────────────────────────────────────────────
+
+def create_album(album_id: str, name: str, description: str = "") -> dict:
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO albums (id, name, description) VALUES (?, ?, ?)",
+        (album_id, name, description),
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM albums WHERE id = ?", (album_id,)).fetchone()
+    conn.close()
+    return dict(row)
+
+
+def get_albums() -> list[dict]:
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT a.*, COUNT(ap.photo_id) as photo_count,
+               (SELECT p.thumbnail_path FROM album_photos ap2
+                JOIN photos p ON p.id = ap2.photo_id
+                WHERE ap2.album_id = a.id
+                ORDER BY ap2.added_at DESC LIMIT 1) as cover_thumb
+        FROM albums a
+        LEFT JOIN album_photos ap ON ap.album_id = a.id
+        GROUP BY a.id
+        ORDER BY a.updated_at DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_album_by_id(album_id: str) -> Optional[dict]:
+    conn = get_db()
+    row = conn.execute("SELECT * FROM albums WHERE id = ?", (album_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_album(album_id: str, name: str, description: str = ""):
+    conn = get_db()
+    conn.execute(
+        "UPDATE albums SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ?",
+        (name, description, album_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_album(album_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM albums WHERE id = ?", (album_id,))
+    conn.commit()
+    conn.close()
+
+
+def add_photos_to_album(album_id: str, photo_ids: list[str]):
+    conn = get_db()
+    conn.executemany(
+        "INSERT OR IGNORE INTO album_photos (album_id, photo_id) VALUES (?, ?)",
+        [(album_id, pid) for pid in photo_ids],
+    )
+    conn.execute("UPDATE albums SET updated_at = datetime('now') WHERE id = ?", (album_id,))
+    conn.commit()
+    conn.close()
+
+
+def remove_photos_from_album(album_id: str, photo_ids: list[str]):
+    conn = get_db()
+    placeholders = ",".join("?" for _ in photo_ids)
+    conn.execute(
+        f"DELETE FROM album_photos WHERE album_id = ? AND photo_id IN ({placeholders})",
+        [album_id] + photo_ids,
+    )
+    conn.execute("UPDATE albums SET updated_at = datetime('now') WHERE id = ?", (album_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_album_photos(album_id: str, limit: int = 500, offset: int = 0) -> tuple[list[dict], int]:
+    conn = get_db()
+    total = conn.execute(
+        "SELECT COUNT(*) as cnt FROM album_photos WHERE album_id = ?", (album_id,)
+    ).fetchone()["cnt"]
+    rows = conn.execute(
+        """SELECT p.* FROM photos p
+           JOIN album_photos ap ON ap.photo_id = p.id
+           WHERE ap.album_id = ?
+           ORDER BY ap.added_at DESC
+           LIMIT ? OFFSET ?""",
+        (album_id, limit, offset),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows], total
+
+
+def get_recent_photos(limit: int = 200) -> tuple[list[dict], int]:
+    """Get most recently indexed photos."""
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) as cnt FROM photos").fetchone()["cnt"]
+    rows = conn.execute(
+        "SELECT * FROM photos ORDER BY indexed_at DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows], total
