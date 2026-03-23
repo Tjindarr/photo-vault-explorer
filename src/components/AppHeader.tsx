@@ -1,4 +1,4 @@
-import { Camera, PanelLeft, LayoutGrid, Map, Sun, Moon, Loader2, Trash2, ImageIcon, Film, Pencil, FolderHeart, Clock, FolderPlus, Settings } from 'lucide-react';
+import { Camera, PanelLeft, LayoutGrid, Map, Loader2, Trash2, ImageIcon, Film, Pencil, FolderHeart, Clock, FolderPlus, Settings } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -33,29 +33,6 @@ const views: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
   { mode: 'settings', icon: Settings, label: 'Settings' },
 ];
 
-function useTheme() {
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
-
-  const toggle = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem('imgvault-theme', next ? 'dark' : 'light');
-  };
-
-  useEffect(() => {
-    const saved = localStorage.getItem('imgvault-theme');
-    if (saved === 'light') {
-      setDark(false);
-      document.documentElement.classList.remove('dark');
-    } else {
-      setDark(true);
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
-
-  return { dark, toggle };
-}
 
 function useIndexStatus() {
   const [status, setStatus] = useState<{ running: boolean; progress: number; total: number; last_run: string | null }>({
