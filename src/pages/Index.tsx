@@ -212,7 +212,7 @@ export default function Index() {
           <div className={cn(
             "flex-1 min-h-0 px-3 sm:px-5",
             viewMode !== 'grid' && "overflow-y-auto scrollbar-thin pb-6",
-            (viewMode === 'trash' || viewMode === 'cleanup') && "overflow-hidden"
+            (viewMode === 'trash' || viewMode === 'cleanup' || viewMode === 'settings') && "overflow-hidden"
           )}>
             {loading && (viewMode === 'grid' || viewMode === 'map') ? (
               <div className="flex items-center justify-center h-full">
