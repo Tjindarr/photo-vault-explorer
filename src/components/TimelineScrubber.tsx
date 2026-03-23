@@ -16,9 +16,9 @@ interface YearGroup {
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export default function TimelineScrubber({ photos, onScrollToDate, activeLabel }: TimelineScrubberProps) {
-  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const scrubberRef = useRef<HTMLDivElement>(null);
+  const [dragLabel, setDragLabel] = useState<string | null>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
 
   const yearGroups = useMemo(() => {
     const map = new Map<string, Map<number, number>>();
@@ -35,9 +35,7 @@ export default function TimelineScrubber({ photos, onScrollToDate, activeLabel }
       const m = d.getMonth();
       monthMap.set(m, (monthMap.get(m) || 0) + 1);
     }
-
     if (minYear === Infinity) return [];
-
     const groups: YearGroup[] = [];
     for (let y = maxYear; y >= minYear; y--) {
       const ys = y.toString();
@@ -65,19 +63,28 @@ export default function TimelineScrubber({ photos, onScrollToDate, activeLabel }
   }, [yearGroups]);
 
   const getLabelAtY = useCallback((clientY: number) => {
-    if (!scrubberRef.current || allLabels.length === 0) return null;
-    const rect = scrubberRef.current.getBoundingClientRect();
+    if (!trackRef.current || allLabels.length === 0) return null;
+    const rect = trackRef.current.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
     const idx = Math.round(ratio * (allLabels.length - 1));
     return allLabels[idx];
   }, [allLabels]);
 
+  // Position of the active dot as a percentage
+  const activeRatio = useMemo(() => {
+    const label = isDragging ? dragLabel : activeLabel;
+    if (!label || allLabels.length === 0) return 0;
+    const idx = allLabels.indexOf(label);
+    if (idx < 0) return 0;
+    return idx / (allLabels.length - 1);
+  }, [activeLabel, dragLabel, isDragging, allLabels]);
+
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     setIsDragging(true);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const label = getLabelAtY(e.clientY);
     if (label) {
-      setHoveredLabel(label);
+      setDragLabel(label);
       onScrollToDate(label);
     }
   }, [getLabelAtY, onScrollToDate]);
@@ -85,83 +92,86 @@ export default function TimelineScrubber({ photos, onScrollToDate, activeLabel }
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
     const label = getLabelAtY(e.clientY);
-    if (label && label !== hoveredLabel) {
-      setHoveredLabel(label);
+    if (label && label !== dragLabel) {
+      setDragLabel(label);
       onScrollToDate(label);
     }
-  }, [isDragging, getLabelAtY, hoveredLabel, onScrollToDate]);
+  }, [isDragging, getLabelAtY, dragLabel, onScrollToDate]);
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
-    setTimeout(() => setHoveredLabel(null), 1000);
+    setDragLabel(null);
   }, []);
 
   if (yearGroups.length === 0) return null;
 
-  const totalMonths = allLabels.length;
-  const compact = totalMonths > 24;
-
-  // Determine which year the active label belongs to
-  const activeYear = activeLabel
-    ? activeLabel.split(' ').pop() || null
-    : null;
+  const displayLabel = isDragging ? dragLabel : activeLabel;
 
   return (
     <div
-      ref={scrubberRef}
       className={cn(
-        "absolute right-0 top-0 bottom-0 z-20 flex flex-col items-center justify-between",
-        "select-none touch-none py-3",
-        "w-12 sm:w-14",
-        "bg-card/80 backdrop-blur-sm border-l border-border/50",
+        "absolute right-0 top-0 bottom-0 z-20 flex",
+        "select-none touch-none",
+        "w-14 sm:w-16",
       )}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
     >
-      {/* Floating tooltip */}
-      {isDragging && hoveredLabel && (
-        <div className="fixed right-16 sm:right-20 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
-          <div className="bg-primary text-primary-foreground text-sm font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
-            {hoveredLabel}
-          </div>
-        </div>
-      )}
-
-      {yearGroups.map((g) => (
-        <div key={g.year} className="flex flex-col items-center gap-0.5 relative">
-          {/* Active indicator dot */}
-          {activeYear === g.year && (
-            <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary shadow-sm shadow-primary/50 transition-all" />
-          )}
-          <span className={cn(
-            "text-[11px] font-bold tabular-nums cursor-pointer transition-colors",
-            activeYear === g.year ? "text-primary" : "text-foreground hover:text-primary",
-            hoveredLabel && g.months.some(m => m.label === hoveredLabel) && "text-primary",
-          )}>
-            {g.year}
-          </span>
-          {!compact && g.months.map((m) => (
+      {/* Year labels column */}
+      <div className="flex flex-col items-center justify-between py-3 flex-1">
+        {yearGroups.map((g) => {
+          const isActive = displayLabel && g.months.some(m => m.label === displayLabel);
+          return (
             <button
-              key={m.label}
+              key={g.year}
               className={cn(
-                "text-[9px] transition-colors leading-tight cursor-pointer relative",
-                activeLabel === m.label
-                  ? "text-primary font-bold"
-                  : "text-muted-foreground hover:text-primary",
-                hoveredLabel === m.label && "text-primary font-semibold",
+                "text-[10px] font-bold tabular-nums transition-colors cursor-pointer",
+                isActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
               )}
-              onClick={() => onScrollToDate(m.label)}
+              onClick={() => g.months.length > 0 && onScrollToDate(g.months[0].label)}
             >
-              {activeLabel === m.label && (
-                <span className="absolute -left-2.5 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-primary" />
-              )}
-              {m.month}
+              {g.year}
             </button>
-          ))}
+          );
+        })}
+      </div>
+
+      {/* Drag track + dot */}
+      <div
+        ref={trackRef}
+        className="relative w-5 flex items-center justify-center cursor-grab active:cursor-grabbing py-3"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        {/* Track line */}
+        <div className="absolute inset-y-3 left-1/2 -translate-x-1/2 w-[2px] bg-border rounded-full" />
+
+        {/* Active dot */}
+        <div
+          className={cn(
+            "absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 transition-all",
+            isDragging ? "duration-0" : "duration-200",
+          )}
+          style={{ top: `calc(12px + ${activeRatio} * (100% - 24px))` }}
+        >
+          <div className={cn(
+            "w-3 h-3 rounded-full bg-primary border-2 border-primary-foreground shadow-md",
+            isDragging && "w-4 h-4 shadow-lg shadow-primary/30",
+          )} />
         </div>
-      ))}
+
+        {/* Tooltip on drag */}
+        {isDragging && displayLabel && (
+          <div
+            className="absolute right-7 -translate-y-1/2 z-50 pointer-events-none"
+            style={{ top: `calc(12px + ${activeRatio} * (100% - 24px))` }}
+          >
+            <div className="bg-primary text-primary-foreground text-xs font-medium px-2.5 py-1 rounded-md shadow-lg whitespace-nowrap">
+              {displayLabel}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
