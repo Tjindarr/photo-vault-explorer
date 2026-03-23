@@ -4,8 +4,9 @@ import { cn } from '@/lib/utils';
 import {
   fetchAlbums, createAlbum, deleteAlbum, fetchAlbumPhotos,
   addPhotosToAlbum, removePhotosFromAlbum,
-  type Album, type Photo,
+  type Album,
 } from '@/lib/api-client';
+import { type Photo } from '@/lib/mock-data';
 import { toast } from 'sonner';
 import PhotoGrid from './PhotoGrid';
 import {
@@ -129,7 +130,6 @@ export default function AlbumsView({ onSelectPhoto, addingPhotoIds, onAddComplet
               deleteMode={false}
               selectedIds={new Set()}
               onToggleSelect={() => {}}
-              onRemoveFromAlbum={handleRemoveFromAlbum}
             />
           )}
         </div>
