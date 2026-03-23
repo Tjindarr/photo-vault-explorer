@@ -1,4 +1,5 @@
 import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw, Trash2, ImageIcon, Film, Pencil, Sparkles, FolderHeart, Clock, FolderPlus } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { fetchIndexStatus, triggerReindex, fetchAlbums, addPhotosToAlbum, createAlbum, type Album } from '@/lib/api-client';
@@ -169,6 +170,7 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
   const { dark, toggle } = useTheme();
   const { status: indexStatus, refresh } = useIndexStatus();
   const [reindexing, setReindexing] = useState(false);
+  const isMobile = useIsMobile();
   const wasRunningRef = useRef(false);
 
   useEffect(() => {
@@ -269,6 +271,31 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
             </button>
             <AddToAlbumButton selectedIds={selectedIds} onComplete={onAddToAlbumComplete} />
           </>
+        )}
+
+        {isMobile && (
+          <div className="flex items-center gap-0.5 ml-1">
+            <button
+              onClick={() => onViewModeChange('cleanup')}
+              className={cn(
+                'p-2 rounded-md transition-colors active:scale-95',
+                viewMode === 'cleanup' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
+              )}
+              aria-label="Cleanup"
+            >
+              <Sparkles className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => onViewModeChange('trash')}
+              className={cn(
+                'p-2 rounded-md transition-colors active:scale-95',
+                viewMode === 'trash' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
+              )}
+              aria-label="Trash"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         )}
 
         <div className="flex-1" />

@@ -12,8 +12,6 @@ const tabs: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
   { mode: 'map', icon: Map, label: 'Map' },
   { mode: 'albums', icon: FolderHeart, label: 'Albums' },
   { mode: 'recent', icon: Clock, label: 'Recent' },
-  { mode: 'cleanup', icon: Sparkles, label: 'Cleanup' },
-  { mode: 'trash', icon: Trash2, label: 'Trash' },
 ];
 
 export default function BottomNav({ viewMode, onViewModeChange }: BottomNavProps) {
