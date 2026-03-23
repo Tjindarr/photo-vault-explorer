@@ -4,6 +4,7 @@ import time
 import logging
 import threading
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 from contextlib import asynccontextmanager
 
@@ -13,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import (
-    init_db, upsert_photo, search_photos, get_folder_tree, get_photo_by_id,
+    init_db, upsert_photo, upsert_photos_batch, search_photos, get_folder_tree, get_photo_by_id,
     get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths,
     get_map_photos, get_map_clusters, get_map_countries, get_map_cities,
     get_duplicate_photos, delete_photos_by_ids,
@@ -57,8 +58,108 @@ def get_current_media_paths() -> set[str]:
     return current_paths
 
 
+BATCH_SIZE = 50  # Commit every N photos
+WORKER_THREADS = 4  # Parallel file processing threads
+
+
+def _process_single_file(args):
+    """Process a single file: extract EXIF, thumbnail, pHash, geocode. Runs in thread pool."""
+    filepath_str, photos_dir, known_hashes, geocode_lang = args
+    # Re-use scan logic but for a single file
+    from indexer import (
+        file_hash, extract_exif, generate_thumbnail_and_phash,
+        generate_video_thumbnail, get_video_duration, reverse_geocode,
+        IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, THUMB_DIR,
+    )
+    from pathlib import Path
+    import hashlib as _hashlib
+    from datetime import datetime as _dt
+
+    filepath = Path(filepath_str)
+    photos_path = Path(photos_dir)
+    ext = filepath.suffix.lower()
+    rel_path = str(filepath.relative_to(photos_path))
+
+    try:
+        file_stat = filepath.stat()
+    except OSError:
+        return None
+
+    fhash = file_hash(str(filepath))
+
+    photo_id = _hashlib.md5(rel_path.encode()).hexdigest()[:16]
+
+    # Check for existing thumbnail (webp or jpg)
+    import os as _os
+    expected_webp = _os.path.join(THUMB_DIR, photo_id[:2], f"{photo_id}.webp")
+    expected_jpg = _os.path.join(THUMB_DIR, photo_id[:2], f"{photo_id}.jpg")
+    if rel_path in known_hashes and known_hashes[rel_path] == fhash and (
+        _os.path.exists(expected_webp) or _os.path.exists(expected_jpg)
+    ):
+        return None  # Skip unchanged
+
+    folder = str(filepath.parent.relative_to(photos_path))
+    if folder == ".":
+        folder = "Root"
+
+    is_video = ext in VIDEO_EXTENSIONS
+
+    meta = {}
+    if not is_video:
+        meta = extract_exif(str(filepath))
+
+    if not meta.get("date_taken"):
+        meta["date_taken"] = _dt.fromtimestamp(file_stat.st_mtime).isoformat()
+
+    thumb_path = None
+    duration = None
+    phash = None
+    if is_video:
+        thumb_path = generate_video_thumbnail(str(filepath), photo_id)
+        duration = get_video_duration(str(filepath))
+    else:
+        thumb_path, phash = generate_thumbnail_and_phash(str(filepath), photo_id)
+
+    # Reverse geocode GPS coordinates
+    geo = {"country": None, "city": None, "location_name": None}
+    gps_lat = meta.get("gps_lat")
+    gps_lng = meta.get("gps_lng")
+    if gps_lat is not None and gps_lng is not None:
+        from geocoder import reverse_geocode
+        geo = reverse_geocode(gps_lat, gps_lng, lang=geocode_lang)
+
+    location = geo.get("location_name") or meta.get("location")
+
+    return {
+        "id": photo_id,
+        "filename": filepath.name,
+        "path": rel_path,
+        "folder": folder,
+        "type": "video" if is_video else "image",
+        "width": meta.get("width", 0),
+        "height": meta.get("height", 0),
+        "file_size": file_stat.st_size,
+        "duration": duration,
+        "date_taken": meta.get("date_taken"),
+        "location": location,
+        "camera": meta.get("camera"),
+        "lens": meta.get("lens"),
+        "iso": meta.get("iso"),
+        "aperture": meta.get("aperture"),
+        "shutter_speed": meta.get("shutter_speed"),
+        "gps_lat": gps_lat,
+        "gps_lng": gps_lng,
+        "thumbnail_path": thumb_path,
+        "file_hash": fhash,
+        "phash": phash,
+        "country": geo.get("country"),
+        "city": geo.get("city"),
+        "file_modified_at": _dt.fromtimestamp(file_stat.st_mtime).isoformat(),
+    }
+
+
 def run_indexer(force_full: bool = False):
-    """Background indexing task. When force_full=True, reprocess all files."""
+    """Background indexing task with parallel processing and batch DB commits."""
     indexing_status["running"] = True
     indexing_status["progress"] = 0
     indexing_status["total"] = 0
@@ -75,7 +176,7 @@ def run_indexer(force_full: bool = False):
         if expired:
             logger.info(f"Purged {len(expired)} expired trash items")
 
-        # Load existing indexed hashes to skip unchanged files unless full reindex is requested
+        # Load existing indexed hashes to skip unchanged files
         known_hashes = {} if force_full else get_indexed_hashes()
         if force_full:
             logger.info("Running full reindex; all files will be reprocessed")
@@ -85,23 +186,59 @@ def run_indexer(force_full: bool = False):
         current_paths = get_current_media_paths()
         logger.info(f"Found {len(current_paths)} media files on disk")
 
+        # Collect all file paths to process
+        from pathlib import Path as _Path
+        from indexer import ALL_EXTENSIONS as _ALL_EXT
+        all_files = []
+        photos_path = _Path(PHOTOS_DIR)
+        for fp in photos_path.rglob("*"):
+            if fp.is_file() and fp.suffix.lower() in _ALL_EXT:
+                all_files.append(str(fp))
+
+        indexing_status["total"] = len(all_files)
+        logger.info(f"Processing {len(all_files)} files with {WORKER_THREADS} threads...")
+
+        geocode_lang = get_setting("geocode_language", "en")
         count = 0
         skipped = 0
+        batch = []
 
-        for photo in scan_directory(known_hashes=known_hashes, geocode_lang=get_setting("geocode_language", "en")):
-            if photo is None:
-                skipped += 1
-                continue
+        with ThreadPoolExecutor(max_workers=WORKER_THREADS) as executor:
+            futures = {
+                executor.submit(_process_single_file, (fp, PHOTOS_DIR, known_hashes, geocode_lang)): fp
+                for fp in all_files
+            }
 
-            upsert_photo(photo)
-            count += 1
-            indexing_status["progress"] = count
-            indexing_status["total"] = count
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                except Exception as e:
+                    logger.warning(f"Processing failed for {futures[future]}: {e}")
+                    skipped += 1
+                    indexing_status["progress"] = count + skipped
+                    continue
 
-            if count % 100 == 0:
-                logger.info(f"Indexed {count} new/changed files ({skipped} skipped)...")
+                if result is None:
+                    skipped += 1
+                    indexing_status["progress"] = count + skipped
+                    continue
 
-        # Clean up removed files (DB entries + thumbnail/transcode files)
+                batch.append(result)
+                count += 1
+                indexing_status["progress"] = count + skipped
+
+                # Flush batch
+                if len(batch) >= BATCH_SIZE:
+                    upsert_photos_batch(batch)
+                    batch = []
+                    if count % 200 == 0:
+                        logger.info(f"Indexed {count} new/changed files ({skipped} skipped)...")
+
+        # Flush remaining
+        if batch:
+            upsert_photos_batch(batch)
+
+        # Clean up removed files
         removed = remove_missing_photos(current_paths)
         if removed:
             for entry in removed:

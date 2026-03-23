@@ -150,26 +150,39 @@ def get_all_settings() -> dict:
     return {row["key"]: row["value"] for row in rows}
 
 
+_UPSERT_SQL = """
+    INSERT INTO photos (id, filename, path, folder, type, width, height,
+        file_size, duration, date_taken, location, camera, lens, iso, aperture,
+        shutter_speed, gps_lat, gps_lng, thumbnail_path, file_hash, phash,
+        country, city, file_modified_at)
+    VALUES (:id, :filename, :path, :folder, :type, :width, :height,
+        :file_size, :duration, :date_taken, :location, :camera, :lens, :iso, :aperture,
+        :shutter_speed, :gps_lat, :gps_lng, :thumbnail_path, :file_hash, :phash,
+        :country, :city, :file_modified_at)
+    ON CONFLICT(path) DO UPDATE SET
+        filename=:filename, folder=:folder, type=:type, width=:width, height=:height,
+        file_size=:file_size, duration=:duration, date_taken=:date_taken, location=:location, camera=:camera,
+        lens=:lens, iso=:iso, aperture=:aperture, shutter_speed=:shutter_speed,
+        gps_lat=:gps_lat, gps_lng=:gps_lng, thumbnail_path=:thumbnail_path,
+        file_hash=:file_hash, phash=:phash, country=:country, city=:city,
+        file_modified_at=:file_modified_at,
+        indexed_at=datetime('now')
+"""
+
+
 def upsert_photo(photo: dict):
     conn = get_db()
-    conn.execute("""
-        INSERT INTO photos (id, filename, path, folder, type, width, height,
-            file_size, duration, date_taken, location, camera, lens, iso, aperture,
-            shutter_speed, gps_lat, gps_lng, thumbnail_path, file_hash, phash,
-            country, city, file_modified_at)
-        VALUES (:id, :filename, :path, :folder, :type, :width, :height,
-            :file_size, :duration, :date_taken, :location, :camera, :lens, :iso, :aperture,
-            :shutter_speed, :gps_lat, :gps_lng, :thumbnail_path, :file_hash, :phash,
-            :country, :city, :file_modified_at)
-        ON CONFLICT(path) DO UPDATE SET
-            filename=:filename, folder=:folder, type=:type, width=:width, height=:height,
-            file_size=:file_size, duration=:duration, date_taken=:date_taken, location=:location, camera=:camera,
-            lens=:lens, iso=:iso, aperture=:aperture, shutter_speed=:shutter_speed,
-            gps_lat=:gps_lat, gps_lng=:gps_lng, thumbnail_path=:thumbnail_path,
-            file_hash=:file_hash, phash=:phash, country=:country, city=:city,
-            file_modified_at=:file_modified_at,
-            indexed_at=datetime('now')
-    """, photo)
+    conn.execute(_UPSERT_SQL, photo)
+    conn.commit()
+    conn.close()
+
+
+def upsert_photos_batch(photos: list[dict]):
+    """Insert/update multiple photos in a single transaction."""
+    if not photos:
+        return
+    conn = get_db()
+    conn.executemany(_UPSERT_SQL, photos)
     conn.commit()
     conn.close()
 

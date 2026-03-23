@@ -294,6 +294,46 @@ def generate_thumbnail(filepath: str, photo_id: str) -> Optional[str]:
         return None
 
 
+def generate_thumbnail_and_phash(filepath: str, photo_id: str) -> tuple[Optional[str], Optional[str]]:
+    """Generate thumbnail and compute pHash in a single image open. Returns (thumb_rel_path, phash_str)."""
+    try:
+        sub_dir = os.path.join(THUMB_DIR, photo_id[:2])
+        os.makedirs(sub_dir, exist_ok=True)
+
+        thumb_filename = f"{photo_id}.webp"
+        thumb_path = os.path.join(sub_dir, thumb_filename)
+        legacy_path = os.path.join(sub_dir, f"{photo_id}.jpg")
+
+        # Check if thumbnail already exists
+        thumb_exists = os.path.exists(thumb_path) or os.path.exists(legacy_path)
+        existing_thumb = None
+        if os.path.exists(thumb_path):
+            existing_thumb = f"{photo_id[:2]}/{thumb_filename}"
+        elif os.path.exists(legacy_path):
+            existing_thumb = f"{photo_id[:2]}/{photo_id}.jpg"
+
+        with Image.open(filepath) as img:
+            # Compute pHash on original image
+            phash_val = str(imagehash.phash(img))
+
+            # Generate thumbnail if needed
+            if not thumb_exists:
+                img = ImageOps.exif_transpose(img)
+                img.thumbnail(THUMB_SIZE, Image.LANCZOS)
+                if img.mode not in ("RGB", "RGBA"):
+                    img = img.convert("RGB")
+                img.save(thumb_path, "WEBP", quality=80, method=4)
+                existing_thumb = f"{photo_id[:2]}/{thumb_filename}"
+
+        return existing_thumb, phash_val
+    except Exception as e:
+        logger.warning(f"Thumbnail+pHash failed for {filepath}: {e}")
+        # Fall back to separate attempts
+        thumb = generate_thumbnail(filepath, photo_id)
+        phash_val = compute_phash(filepath)
+        return thumb, phash_val
+
+
 def compute_phash(filepath: str) -> Optional[str]:
     """Compute perceptual hash for an image file."""
     try:
@@ -439,8 +479,8 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None, geoc
             thumb_path = generate_video_thumbnail(str(filepath), photo_id)
             duration = get_video_duration(str(filepath))
         else:
-            thumb_path = generate_thumbnail(str(filepath), photo_id)
-            phash = compute_phash(str(filepath))
+            # Single image open for both thumbnail and pHash
+            thumb_path, phash = generate_thumbnail_and_phash(str(filepath), photo_id)
 
         # Reverse geocode GPS coordinates
         geo = {"country": None, "city": None, "location_name": None}
