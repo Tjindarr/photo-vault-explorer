@@ -1,7 +1,11 @@
-import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw, Trash2, ImageIcon, Film, Pencil, Sparkles, FolderHeart, Clock } from 'lucide-react';
+import { Camera, PanelLeft, LayoutGrid, Map, BarChart3, Sun, Moon, Loader2, RefreshCw, Trash2, ImageIcon, Film, Pencil, Sparkles, FolderHeart, Clock, FolderPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { fetchIndexStatus, triggerReindex } from '@/lib/api-client';
+import { fetchIndexStatus, triggerReindex, fetchAlbums, addPhotosToAlbum, createAlbum, type Album } from '@/lib/api-client';
+import { toast } from 'sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 export type ViewMode = 'grid' | 'map' | 'stats' | 'trash' | 'cleanup' | 'albums' | 'recent';
 
@@ -14,8 +18,10 @@ interface AppHeaderProps {
   deleteMode?: boolean;
   onDeleteModeChange?: (on: boolean) => void;
   selectedCount?: number;
+  selectedIds?: Set<string>;
   onDeleteSelected?: () => void;
   onReindexComplete?: () => void;
+  onAddToAlbumComplete?: () => void;
 }
 
 const views: { mode: ViewMode; icon: typeof LayoutGrid; label: string }[] = [
