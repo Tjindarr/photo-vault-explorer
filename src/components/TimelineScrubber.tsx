@@ -100,7 +100,8 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
       className={cn(
         "absolute right-0 top-0 bottom-0 z-20 flex flex-col items-end justify-between",
         "select-none touch-none py-2",
-        "w-10 sm:w-12",
+        "w-14 sm:w-16",
+        "bg-card/80 backdrop-blur-sm border-l border-border/50 rounded-l-lg",
       )}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -109,7 +110,7 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
     >
       {/* Floating tooltip */}
       {isDragging && hoveredLabel && (
-        <div className="fixed right-16 sm:right-20 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
+        <div className="fixed right-20 sm:right-24 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
           <div className="bg-primary text-primary-foreground text-sm font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
             {hoveredLabel}
           </div>
@@ -118,14 +119,13 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
 
       {/* Year/month ticks */}
       {compact ? (
-        // Show only years
         yearGroups.map((g) => (
           <button
             key={g.year}
             className={cn(
-              "text-[10px] font-semibold tabular-nums text-muted-foreground hover:text-foreground transition-colors",
-              "px-1.5 py-0.5 rounded",
-              hoveredLabel && g.months.some(m => m.label === hoveredLabel) && "text-primary font-bold",
+              "text-[11px] font-semibold tabular-nums text-muted-foreground hover:text-primary transition-colors",
+              "px-2 py-0.5 rounded",
+              hoveredLabel && g.months.some(m => m.label === hoveredLabel) && "text-primary font-bold bg-primary/10",
             )}
             onClick={() => onScrollToDate(g.months[0].label)}
           >
@@ -135,13 +135,13 @@ export default function TimelineScrubber({ photos, onScrollToDate }: TimelineScr
       ) : (
         yearGroups.map((g) => (
           <div key={g.year} className="flex flex-col items-end gap-px">
-            <span className="text-[9px] font-bold text-foreground/70 pr-1.5">{g.year.slice(2)}</span>
+            <span className="text-[10px] font-bold text-foreground pr-2">{g.year.slice(2)}</span>
             {g.months.map((m) => (
               <button
                 key={m.label}
                 className={cn(
-                  "text-[8px] text-muted-foreground hover:text-foreground transition-colors",
-                  "pr-1.5 leading-tight",
+                  "text-[9px] text-muted-foreground hover:text-primary transition-colors",
+                  "pr-2 leading-tight",
                   hoveredLabel === m.label && "text-primary font-semibold",
                 )}
                 onClick={() => onScrollToDate(m.label)}
