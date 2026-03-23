@@ -329,4 +329,17 @@ export async function fetchRecentPhotos(limit = 200): Promise<{ items: Photo[]; 
   return fetchJson(`${API_BASE}/recent?limit=${limit}`);
 }
 
+export async function fetchSettings(): Promise<Record<string, string>> {
+  if (!(await isApiAvailable())) return {};
+  return fetchJson(`${API_BASE}/settings`);
+}
+
+export async function updateSetting(key: string, value: string): Promise<void> {
+  await fetchJson(`${API_BASE}/settings/${key}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value }),
+  });
+}
+
 export { isApiAvailable };

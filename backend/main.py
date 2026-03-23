@@ -21,6 +21,7 @@ from database import (
     get_cleanup_data,
     create_album, get_albums, get_album_by_id, update_album, delete_album,
     add_photos_to_album, remove_photos_from_album, get_album_photos, get_recent_photos,
+    get_setting, set_setting, get_all_settings,
 )
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 
@@ -87,7 +88,7 @@ def run_indexer(force_full: bool = False):
         count = 0
         skipped = 0
 
-        for photo in scan_directory(known_hashes=known_hashes):
+        for photo in scan_directory(known_hashes=known_hashes, geocode_lang=get_setting("geocode_language", "en")):
             if photo is None:
                 skipped += 1
                 continue
@@ -865,3 +866,21 @@ def remove_from_album(album_id: str, req: AlbumPhotosRequest):
 def list_recent(limit: int = Query(200, ge=1, le=5000)):
     photos, total = get_recent_photos(limit=limit)
     return {"items": [_format_photo(p) for p in photos], "total": total}
+
+
+# ── Settings endpoints ────────────────────────────────────────────
+
+class SettingUpdate(BaseModel):
+    value: str
+
+@app.get("/api/settings")
+def list_settings():
+    return get_all_settings()
+
+@app.put("/api/settings/{key}")
+def update_setting(key: str, body: SettingUpdate):
+    allowed_keys = {"geocode_language"}
+    if key not in allowed_keys:
+        raise HTTPException(status_code=400, detail=f"Unknown setting: {key}")
+    set_setting(key, body.value)
+    return {"ok": True, "key": key, "value": body.value}

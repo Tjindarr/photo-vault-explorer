@@ -380,7 +380,7 @@ def get_video_duration(filepath: str) -> Optional[float]:
     return None
 
 
-def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
+def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None, geocode_lang: str = "en"):
     """Scan directory recursively. Yields None for skipped files, dict for new/changed."""
     if known_hashes is None:
         known_hashes = {}
@@ -447,7 +447,7 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None):
         gps_lat = meta.get("gps_lat")
         gps_lng = meta.get("gps_lng")
         if gps_lat is not None and gps_lng is not None:
-            geo = reverse_geocode(gps_lat, gps_lng)
+            geo = reverse_geocode(gps_lat, gps_lng, lang=geocode_lang)
 
         location = geo.get("location_name") or meta.get("location")
 

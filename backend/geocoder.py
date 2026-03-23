@@ -81,7 +81,7 @@ def _rate_limit():
     _last_request_time = time.time()
 
 
-def reverse_geocode(lat: float, lng: float) -> dict:
+def reverse_geocode(lat: float, lng: float, lang: str = "en") -> dict:
     """Reverse geocode coordinates to country/city/street.
 
     Uses a grid-based cache key (rounded to ~1km) to avoid redundant lookups
@@ -93,7 +93,8 @@ def reverse_geocode(lat: float, lng: float) -> dict:
         logger.info(f"Loaded {len(_cache)} cached geocode entries from DB")
 
     # Round to ~1km grid to cache nearby locations together
-    cache_key = f"{lat:.3f},{lng:.3f}"
+    # Include language in cache key so changing language re-fetches
+    cache_key = f"{lat:.3f},{lng:.3f}:{lang}"
     if cache_key in _cache:
         return _cache[cache_key]
 
@@ -104,6 +105,7 @@ def reverse_geocode(lat: float, lng: float) -> dict:
         url = (
             f"https://nominatim.openstreetmap.org/reverse?"
             f"lat={lat}&lon={lng}&format=json&addressdetails=1&zoom=16"
+            f"&accept-language={lang}"
         )
         req = urllib.request.Request(url, headers={"User-Agent": "ImgVault/1.0"})
         with urllib.request.urlopen(req, timeout=10) as resp:
