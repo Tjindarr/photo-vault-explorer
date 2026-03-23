@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Play, MapPin, Calendar, CheckCircle2, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Photo } from '@/lib/mock-data';
+import TimelineScrubber from './TimelineScrubber';
 
 interface PhotoGridProps {
   photos: Photo[];
