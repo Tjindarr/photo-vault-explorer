@@ -117,8 +117,37 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_album_photos_photo ON album_photos(photo_id);
     """)
 
+    # Settings table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+
     conn.commit()
     conn.close()
+
+
+def get_setting(key: str, default: str = "") -> str:
+    conn = get_db()
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    conn.close()
+    return row["value"] if row else default
+
+
+def set_setting(key: str, value: str):
+    conn = get_db()
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+    conn.commit()
+    conn.close()
+
+
+def get_all_settings() -> dict:
+    conn = get_db()
+    rows = conn.execute("SELECT key, value FROM settings").fetchall()
+    conn.close()
+    return {row["key"]: row["value"] for row in rows}
 
 
 def upsert_photo(photo: dict):
