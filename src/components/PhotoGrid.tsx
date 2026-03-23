@@ -212,9 +212,18 @@ export default function PhotoGrid({ photos, onSelect, hasMore, loadingMore, onLo
     );
   }
 
+  // Scroll to a date header by label
+  const handleScrollToDate = useCallback((label: string) => {
+    const idx = rows.findIndex(r => r.type === 'header' && r.label === label);
+    if (idx >= 0) {
+      virtualizer.scrollToIndex(idx, { align: 'start' });
+    }
+  }, [rows, virtualizer]);
+
   return (
-    <div className="h-full flex flex-col">
-      <div ref={containerRef} className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
+    <div className="h-full flex flex-col relative">
+      <TimelineScrubber photos={photos} onScrollToDate={handleScrollToDate} />
+      <div ref={containerRef} className="flex-1 overflow-y-auto scrollbar-thin min-h-0 pr-10 sm:pr-12">
       <div
         style={{
           height: `${virtualizer.getTotalSize()}px`,
