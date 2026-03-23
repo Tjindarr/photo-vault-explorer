@@ -130,7 +130,7 @@ export default function SettingsView({ onSelectPhoto }: SettingsViewProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
-      <div className="flex items-center gap-1 px-1 pb-3 border-b border-border overflow-x-auto scrollbar-thin">
+      <div className="flex items-center gap-1 px-1 pt-3 pb-3 border-b border-border overflow-x-auto scrollbar-thin">
         {tabs.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
