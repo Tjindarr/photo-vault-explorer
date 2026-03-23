@@ -21,6 +21,7 @@ from database import (
     get_cleanup_data,
     create_album, get_albums, get_album_by_id, update_album, delete_album,
     add_photos_to_album, remove_photos_from_album, get_album_photos, get_recent_photos,
+    get_setting, set_setting, get_all_settings,
 )
 from indexer import scan_directory, PHOTOS_DIR, THUMB_DIR, ALL_EXTENSIONS, generate_thumbnail, generate_video_thumbnail
 
