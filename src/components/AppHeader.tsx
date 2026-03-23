@@ -163,6 +163,7 @@ function AddToAlbumButton({ selectedIds, onComplete }: { selectedIds?: Set<strin
       </PopoverContent>
     </Popover>
   );
+}
 
 export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange, typeFilter, onTypeFilterChange, deleteMode, onDeleteModeChange, selectedCount = 0, selectedIds, onDeleteSelected, onReindexComplete, onAddToAlbumComplete }: AppHeaderProps) {
   const { dark, toggle } = useTheme();
