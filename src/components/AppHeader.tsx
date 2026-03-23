@@ -80,7 +80,7 @@ function useIndexStatus() {
   return { status, refresh: poll };
 }
 
-export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange, typeFilter, onTypeFilterChange, deleteMode, onDeleteModeChange, selectedCount = 0, onDeleteSelected, onReindexComplete }: AppHeaderProps) {
+export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange, typeFilter, onTypeFilterChange, deleteMode, onDeleteModeChange, selectedCount = 0, selectedIds, onDeleteSelected, onReindexComplete, onAddToAlbumComplete }: AppHeaderProps) {
   const { dark, toggle } = useTheme();
   const { status: indexStatus, refresh } = useIndexStatus();
   const [reindexing, setReindexing] = useState(false);
@@ -174,13 +174,16 @@ export default function AppHeader({ onToggleSidebar, viewMode, onViewModeChange,
         )}
 
         {deleteMode && selectedCount > 0 && onDeleteSelected && (
-          <button
-            onClick={onDeleteSelected}
-            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-medium active:scale-95"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {selectedCount}
-          </button>
+          <>
+            <button
+              onClick={onDeleteSelected}
+              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-medium active:scale-95"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {selectedCount}
+            </button>
+            <AddToAlbumButton selectedIds={selectedIds} onComplete={onAddToAlbumComplete} />
+          </>
         )}
 
         <div className="flex-1" />
