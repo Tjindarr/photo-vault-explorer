@@ -158,12 +158,19 @@ def _process_single_file(args):
     }
 
 
-def run_indexer(force_full: bool = False):
-    """Background indexing task with parallel processing and batch DB commits."""
+def run_indexer(force_full: bool = False, quick: bool = False):
+    """Background indexing task with parallel processing and batch DB commits.
+
+    Modes:
+      - force_full=True: reprocess every file from scratch (slow)
+      - quick=True: only scan files whose path is not yet in the DB (fast — for new photos)
+      - default: incremental — hash-check every file and reprocess changed ones
+    """
     indexing_status["running"] = True
     indexing_status["progress"] = 0
     indexing_status["total"] = 0
-    logger.info(f"Starting index scan of {PHOTOS_DIR}...")
+    mode_label = "full" if force_full else ("quick" if quick else "incremental")
+    logger.info(f"Starting {mode_label} index scan of {PHOTOS_DIR}...")
 
     try:
         # Auto-purge expired trash items (>30 days)
@@ -176,23 +183,35 @@ def run_indexer(force_full: bool = False):
         if expired:
             logger.info(f"Purged {len(expired)} expired trash items")
 
-        # Load existing indexed hashes to skip unchanged files
-        known_hashes = {} if force_full else get_indexed_hashes()
+        # Load existing indexed data appropriate for the chosen mode
         if force_full:
+            known_hashes = {}
+            known_paths = set()
             logger.info("Running full reindex; all files will be reprocessed")
+        elif quick:
+            known_hashes = {}  # not needed — we filter purely by path
+            known_paths = get_indexed_paths()
+            logger.info(f"Quick mode: {len(known_paths)} files already indexed; only new files will be processed")
         else:
+            known_hashes = get_indexed_hashes()
+            known_paths = set()
             logger.info(f"Found {len(known_hashes)} already-indexed files in DB")
 
         current_paths = get_current_media_paths()
         logger.info(f"Found {len(current_paths)} media files on disk")
 
-        # Collect all file paths to process
+        # Collect file paths to process
         from pathlib import Path as _Path
         from indexer import ALL_EXTENSIONS as _ALL_EXT
         all_files = []
         photos_path = _Path(PHOTOS_DIR)
         for fp in photos_path.rglob("*"):
             if fp.is_file() and fp.suffix.lower() in _ALL_EXT:
+                if quick:
+                    # Skip files already in DB without even hashing them
+                    rel = str(fp.relative_to(photos_path))
+                    if rel in known_paths:
+                        continue
                 all_files.append(str(fp))
 
         indexing_status["total"] = len(all_files)
