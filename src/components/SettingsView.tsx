@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Settings, Globe, RefreshCw, Loader2, Sparkles, BarChart3, Trash2, Sun, Moon } from 'lucide-react';
+import { Settings, Globe, RefreshCw, Loader2, Sparkles, BarChart3, Trash2, Sun, Moon, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { fetchSettings, updateSetting, fetchIndexStatus, triggerReindex, fetchStats } from '@/lib/api-client';
+import { fetchSettings, updateSetting, fetchIndexStatus, triggerReindex, triggerQuickReindex, fetchStats } from '@/lib/api-client';
 import { toast } from 'sonner';
 import CleanupView from './CleanupView';
 import StatsDashboard from './StatsDashboard';
