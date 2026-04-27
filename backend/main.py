@@ -834,16 +834,25 @@ def empty_trash(req: EmptyTrashRequest):
 
 
 @app.post("/api/reindex")
-def reindex(full: bool = Query(True, description="Reprocess all files, even unchanged ones")):
+def reindex(
+    full: bool = Query(True, description="Reprocess all files, even unchanged ones"),
+    quick: bool = Query(False, description="Quick mode: only scan files not yet in the database"),
+):
     if indexing_status["running"]:
         return JSONResponse(
             status_code=409,
             content={"message": "Indexing already in progress", "status": indexing_status},
         )
 
-    thread = threading.Thread(target=run_indexer, kwargs={"force_full": full}, daemon=True)
+    # Quick mode overrides full
+    force_full = full and not quick
+    thread = threading.Thread(
+        target=run_indexer,
+        kwargs={"force_full": force_full, "quick": quick},
+        daemon=True,
+    )
     thread.start()
-    return {"message": "Reindexing started", "status": indexing_status, "full": full}
+    return {"message": "Reindexing started", "status": indexing_status, "full": force_full, "quick": quick}
 
 
 @app.get("/api/index-status")
