@@ -84,9 +84,22 @@ export default function SettingsView({ onSelectPhoto }: SettingsViewProps) {
     try {
       await triggerReindex();
       await pollIndex();
-      toast.success('Reindexing started');
+      toast.success('Full reindexing started');
     } catch {
       toast.error('Failed to start reindex');
+      setReindexing(false);
+    }
+  };
+
+  const handleQuickReindex = async () => {
+    if (indexStatus.running || reindexing) return;
+    setReindexing(true);
+    try {
+      await triggerQuickReindex();
+      await pollIndex();
+      toast.success('Quick reindexing started — only new photos will be scanned');
+    } catch {
+      toast.error('Failed to start quick reindex');
       setReindexing(false);
     }
   };
