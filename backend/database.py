@@ -331,6 +331,14 @@ def get_indexed_hashes() -> dict[str, str]:
     return {row["path"]: row["file_hash"] for row in rows}
 
 
+def get_indexed_paths() -> set[str]:
+    """Return a set of all indexed photo paths (fast — no hashes)."""
+    conn = get_db()
+    rows = conn.execute("SELECT path FROM photos").fetchall()
+    conn.close()
+    return {row["path"] for row in rows}
+
+
 def get_stats() -> dict:
     conn = get_db()
     total = conn.execute("SELECT COUNT(*) as cnt FROM photos").fetchone()["cnt"]
