@@ -220,25 +220,49 @@ export default function SettingsView({ onSelectPhoto }: SettingsViewProps) {
             <section className="space-y-3">
               <h2 className="text-sm font-semibold text-foreground">Indexing</h2>
               <div className="rounded-lg border border-border bg-surface p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-foreground">Quick Reindex</p>
+                    <p className="text-xs text-muted-foreground">
+                      Only scan files that aren't in the library yet. Fast — use this after adding new photos.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleQuickReindex}
+                    disabled={indexStatus.running || reindexing}
+                    className={cn(
+                      'shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition-colors',
+                      indexStatus.running || reindexing
+                        ? 'cursor-not-allowed bg-muted text-muted-foreground'
+                        : 'bg-surface text-foreground hover:bg-secondary',
+                    )}
+                  >
+                    <Zap className={cn('h-3.5 w-3.5', (indexStatus.running || reindexing) && 'animate-pulse')} />
+                    {indexStatus.running ? 'Indexing…' : 'Quick Scan'}
+                  </button>
+                </div>
+
+                <div className="h-px bg-border" />
+
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <p className="text-sm text-foreground">Full Reindex</p>
                     <p className="text-xs text-muted-foreground">
-                      Rescan all files, regenerate thumbnails, and update location data.
+                      Rescan all files, regenerate thumbnails, and update location data. Slow for large libraries.
                     </p>
                   </div>
                   <button
                     onClick={handleReindex}
                     disabled={indexStatus.running || reindexing}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition-colors',
+                      'shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition-colors',
                       indexStatus.running || reindexing
                         ? 'cursor-not-allowed bg-muted text-muted-foreground'
                         : 'bg-surface text-foreground hover:bg-secondary',
                     )}
                   >
                     <RefreshCw className={cn('h-3.5 w-3.5', (indexStatus.running || reindexing) && 'animate-spin')} />
-                    {indexStatus.running ? 'Indexing…' : 'Reindex'}
+                    {indexStatus.running ? 'Indexing…' : 'Full Reindex'}
                   </button>
                 </div>
                 {indexStatus.running && (
