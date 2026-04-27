@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import (
     init_db, upsert_photo, upsert_photos_batch, search_photos, get_folder_tree, get_photo_by_id,
-    get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths,
+    get_stats, remove_missing_photos, get_indexed_hashes, get_indexed_paths, remove_photos_by_paths,
     get_map_photos, get_map_clusters, get_map_countries, get_map_cities,
     get_duplicate_photos, delete_photos_by_ids,
     add_to_trash, get_trash_items, get_trash_item_by_id, remove_from_trash, purge_expired_trash,
