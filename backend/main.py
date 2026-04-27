@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import (
     init_db, upsert_photo, upsert_photos_batch, search_photos, get_folder_tree, get_photo_by_id,
-    get_stats, remove_missing_photos, get_indexed_hashes, remove_photos_by_paths,
+    get_stats, remove_missing_photos, get_indexed_hashes, get_indexed_paths, remove_photos_by_paths,
     get_map_photos, get_map_clusters, get_map_countries, get_map_cities,
     get_duplicate_photos, delete_photos_by_ids,
     add_to_trash, get_trash_items, get_trash_item_by_id, remove_from_trash, purge_expired_trash,
@@ -158,12 +158,19 @@ def _process_single_file(args):
     }
 
 
-def run_indexer(force_full: bool = False):
-    """Background indexing task with parallel processing and batch DB commits."""
+def run_indexer(force_full: bool = False, quick: bool = False):
+    """Background indexing task with parallel processing and batch DB commits.
+
+    Modes:
+      - force_full=True: reprocess every file from scratch (slow)
+      - quick=True: only scan files whose path is not yet in the DB (fast — for new photos)
+      - default: incremental — hash-check every file and reprocess changed ones
+    """
     indexing_status["running"] = True
     indexing_status["progress"] = 0
     indexing_status["total"] = 0
-    logger.info(f"Starting index scan of {PHOTOS_DIR}...")
+    mode_label = "full" if force_full else ("quick" if quick else "incremental")
+    logger.info(f"Starting {mode_label} index scan of {PHOTOS_DIR}...")
 
     try:
         # Auto-purge expired trash items (>30 days)
@@ -176,23 +183,35 @@ def run_indexer(force_full: bool = False):
         if expired:
             logger.info(f"Purged {len(expired)} expired trash items")
 
-        # Load existing indexed hashes to skip unchanged files
-        known_hashes = {} if force_full else get_indexed_hashes()
+        # Load existing indexed data appropriate for the chosen mode
         if force_full:
+            known_hashes = {}
+            known_paths = set()
             logger.info("Running full reindex; all files will be reprocessed")
+        elif quick:
+            known_hashes = {}  # not needed — we filter purely by path
+            known_paths = get_indexed_paths()
+            logger.info(f"Quick mode: {len(known_paths)} files already indexed; only new files will be processed")
         else:
+            known_hashes = get_indexed_hashes()
+            known_paths = set()
             logger.info(f"Found {len(known_hashes)} already-indexed files in DB")
 
         current_paths = get_current_media_paths()
         logger.info(f"Found {len(current_paths)} media files on disk")
 
-        # Collect all file paths to process
+        # Collect file paths to process
         from pathlib import Path as _Path
         from indexer import ALL_EXTENSIONS as _ALL_EXT
         all_files = []
         photos_path = _Path(PHOTOS_DIR)
         for fp in photos_path.rglob("*"):
             if fp.is_file() and fp.suffix.lower() in _ALL_EXT:
+                if quick:
+                    # Skip files already in DB without even hashing them
+                    rel = str(fp.relative_to(photos_path))
+                    if rel in known_paths:
+                        continue
                 all_files.append(str(fp))
 
         indexing_status["total"] = len(all_files)
@@ -815,16 +834,25 @@ def empty_trash(req: EmptyTrashRequest):
 
 
 @app.post("/api/reindex")
-def reindex(full: bool = Query(True, description="Reprocess all files, even unchanged ones")):
+def reindex(
+    full: bool = Query(True, description="Reprocess all files, even unchanged ones"),
+    quick: bool = Query(False, description="Quick mode: only scan files not yet in the database"),
+):
     if indexing_status["running"]:
         return JSONResponse(
             status_code=409,
             content={"message": "Indexing already in progress", "status": indexing_status},
         )
 
-    thread = threading.Thread(target=run_indexer, kwargs={"force_full": full}, daemon=True)
+    # Quick mode overrides full
+    force_full = full and not quick
+    thread = threading.Thread(
+        target=run_indexer,
+        kwargs={"force_full": force_full, "quick": quick},
+        daemon=True,
+    )
     thread.start()
-    return {"message": "Reindexing started", "status": indexing_status, "full": full}
+    return {"message": "Reindexing started", "status": indexing_status, "full": force_full, "quick": quick}
 
 
 @app.get("/api/index-status")

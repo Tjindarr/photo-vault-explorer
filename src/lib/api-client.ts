@@ -181,6 +181,10 @@ export async function triggerReindex(): Promise<{ message: string }> {
   return fetchJson(`${API_BASE}/reindex?full=true`, { method: 'POST' });
 }
 
+export async function triggerQuickReindex(): Promise<{ message: string }> {
+  return fetchJson(`${API_BASE}/reindex?quick=true&full=false`, { method: 'POST' });
+}
+
 export async function fetchIndexStatus(): Promise<{
   running: boolean;
   progress: number;
