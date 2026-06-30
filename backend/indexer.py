@@ -1,4 +1,5 @@
 import os
+import re
 import hashlib
 import subprocess
 import uuid
@@ -6,6 +7,37 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+
+# Match common date-in-filename patterns. Order matters: most specific first.
+# Examples covered:
+#   20260526_212037000_iOS, 20170222-075200, IMG_20230101_120000,
+#   PXL_20230101_120000123, Screenshot_20230101-120000,
+#   IMG-20230101-WA0001, 2023-01-01 12.00.00
+_FILENAME_DATE_PATTERNS = [
+    re.compile(r"(?P<Y>20\d{2})(?P<m>\d{2})(?P<d>\d{2})[-_ T](?P<H>\d{2})(?P<M>\d{2})(?P<S>\d{2})"),
+    re.compile(r"(?P<Y>20\d{2})-(?P<m>\d{2})-(?P<d>\d{2})[-_ T](?P<H>\d{2})[.\-:](?P<M>\d{2})[.\-:](?P<S>\d{2})"),
+    re.compile(r"(?P<Y>20\d{2})(?P<m>\d{2})(?P<d>\d{2})"),  # date only (WhatsApp etc.)
+]
+
+
+def date_from_filename(name: str) -> Optional[str]:
+    """Extract a capture date from a filename. Returns ISO string or None."""
+    for pat in _FILENAME_DATE_PATTERNS:
+        m = pat.search(name)
+        if not m:
+            continue
+        try:
+            g = m.groupdict()
+            dt = datetime(
+                int(g["Y"]), int(g["m"]), int(g["d"]),
+                int(g.get("H") or 0), int(g.get("M") or 0), int(g.get("S") or 0),
+            )
+            return dt.isoformat()
+        except (ValueError, KeyError):
+            continue
+    return None
+
 
 import exifread
 import imagehash
@@ -470,9 +502,17 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None, geoc
             meta = extract_exif(str(filepath))
 
         if not meta.get("date_taken"):
-            # Fallback chain: file created (birthtime) -> ctime -> mtime
-            ts = getattr(file_stat, "st_birthtime", None) or file_stat.st_ctime or file_stat.st_mtime
-            meta["date_taken"] = datetime.fromtimestamp(ts).isoformat()
+            # Try parsing the filename first (e.g. 20230101_120000_iOS.png)
+            fname_date = date_from_filename(filepath.name)
+            if fname_date:
+                meta["date_taken"] = fname_date
+            else:
+                # Fallback chain: mtime is usually preserved when copying, so
+                # prefer it over birthtime/ctime which reflect when the file
+                # landed on this filesystem.
+                ts = file_stat.st_mtime or getattr(file_stat, "st_birthtime", None) or file_stat.st_ctime
+                meta["date_taken"] = datetime.fromtimestamp(ts).isoformat()
+
 
         thumb_path = None
         duration = None

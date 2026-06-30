@@ -69,8 +69,10 @@ def _process_single_file(args):
     from indexer import (
         file_hash, extract_exif, generate_thumbnail_and_phash,
         generate_video_thumbnail, get_video_duration, reverse_geocode,
+        date_from_filename,
         IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, THUMB_DIR,
     )
+
     from pathlib import Path
     import hashlib as _hashlib
     from datetime import datetime as _dt
@@ -109,9 +111,15 @@ def _process_single_file(args):
         meta = extract_exif(str(filepath))
 
     if not meta.get("date_taken"):
-        # Fallback chain: file created (birthtime) -> ctime -> mtime
-        ts = getattr(file_stat, "st_birthtime", None) or file_stat.st_ctime or file_stat.st_mtime
-        meta["date_taken"] = _dt.fromtimestamp(ts).isoformat()
+        # Try parsing the filename first (e.g. 20230101_120000_iOS.png)
+        fname_date = date_from_filename(filepath.name)
+        if fname_date:
+            meta["date_taken"] = fname_date
+        else:
+            # Prefer mtime (usually preserved when copying) over birthtime/ctime
+            ts = file_stat.st_mtime or getattr(file_stat, "st_birthtime", None) or file_stat.st_ctime
+            meta["date_taken"] = _dt.fromtimestamp(ts).isoformat()
+
 
     thumb_path = None
     duration = None
