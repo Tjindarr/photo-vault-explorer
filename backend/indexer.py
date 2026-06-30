@@ -502,9 +502,17 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None, geoc
             meta = extract_exif(str(filepath))
 
         if not meta.get("date_taken"):
-            # Fallback chain: file created (birthtime) -> ctime -> mtime
-            ts = getattr(file_stat, "st_birthtime", None) or file_stat.st_ctime or file_stat.st_mtime
-            meta["date_taken"] = datetime.fromtimestamp(ts).isoformat()
+            # Try parsing the filename first (e.g. 20230101_120000_iOS.png)
+            fname_date = date_from_filename(filepath.name)
+            if fname_date:
+                meta["date_taken"] = fname_date
+            else:
+                # Fallback chain: mtime is usually preserved when copying, so
+                # prefer it over birthtime/ctime which reflect when the file
+                # landed on this filesystem.
+                ts = file_stat.st_mtime or getattr(file_stat, "st_birthtime", None) or file_stat.st_ctime
+                meta["date_taken"] = datetime.fromtimestamp(ts).isoformat()
+
 
         thumb_path = None
         duration = None
