@@ -9,15 +9,36 @@ from pathlib import Path
 from typing import Optional
 
 
-# Match common date-in-filename patterns. Order matters: most specific first.
-# Examples covered:
-#   20260526_212037000_iOS, 20170222-075200, IMG_20230101_120000,
-#   PXL_20230101_120000123, Screenshot_20230101-120000,
-#   IMG-20230101-WA0001, 2023-01-01 12.00.00
+# Match common date-in-filename patterns. Order matters: most specific first
+# (date+time before date-only) so we capture the most precise timestamp.
+#
+# Camera / phone naming conventions covered:
+#   Samsung:    20260526_212037, 20260526_212037000_iOS
+#   Sony/Canon: 20170222-075200, DSC_20230101_120000
+#   Android:    IMG_20230101_120000, IMG_20230101_120000_HDR,
+#               VID_20230101_120000, PXL_20230101_120000123
+#   Google:     PXL_20230101_120000123.MP, MVIMG_20230101_120000
+#   Screenshot: Screenshot_20230101-120000, Screenshot 2023-01-01 12.00.00
+#   WhatsApp:   IMG-20230101-WA0001, VID-20230101-WA0002
+#   iOS export: 2023-01-01 12.00.00, 2023-01-01_12-00-00
+#   Dotted:     2023.01.01_12.00.00, 2023.01.01-12.00.00
+#   Underscored:2023_01_01_12_00_00
+#   ISO basic:  20230101T120000
+#   Older cams: 19990101_120000 (broadened year range)
+_DSEP = r"[-_ T\.]"          # separator between date and time
+_TSEP = r"[-_\.:]"           # separator between H/M/S components
+_Y = r"(?P<Y>(?:19|20)\d{2})"
 _FILENAME_DATE_PATTERNS = [
-    re.compile(r"(?P<Y>20\d{2})(?P<m>\d{2})(?P<d>\d{2})[-_ T](?P<H>\d{2})(?P<M>\d{2})(?P<S>\d{2})"),
-    re.compile(r"(?P<Y>20\d{2})-(?P<m>\d{2})-(?P<d>\d{2})[-_ T](?P<H>\d{2})[.\-:](?P<M>\d{2})[.\-:](?P<S>\d{2})"),
-    re.compile(r"(?P<Y>20\d{2})(?P<m>\d{2})(?P<d>\d{2})"),  # date only (WhatsApp etc.)
+    # YYYY-MM-DD with time (any separators between components)
+    re.compile(rf"{_Y}[-_\.](?P<m>\d{{2}})[-_\.](?P<d>\d{{2}}){_DSEP}(?P<H>\d{{2}}){_TSEP}(?P<M>\d{{2}}){_TSEP}(?P<S>\d{{2}})"),
+    # YYYYMMDD with time (any separators), optional trailing ms / suffix
+    re.compile(rf"{_Y}(?P<m>\d{{2}})(?P<d>\d{{2}}){_DSEP}(?P<H>\d{{2}})(?P<M>\d{{2}})(?P<S>\d{{2}})"),
+    # YYYYMMDD with HHMM only (no seconds)
+    re.compile(rf"{_Y}(?P<m>\d{{2}})(?P<d>\d{{2}}){_DSEP}(?P<H>\d{{2}})(?P<M>\d{{2}})"),
+    # YYYY-MM-DD date only (WhatsApp, screenshots, etc.)
+    re.compile(rf"{_Y}[-_\.](?P<m>\d{{2}})[-_\.](?P<d>\d{{2}})"),
+    # YYYYMMDD date only
+    re.compile(rf"{_Y}(?P<m>\d{{2}})(?P<d>\d{{2}})"),
 ]
 
 
