@@ -200,6 +200,75 @@ def extract_exif(filepath: str) -> dict:
     return meta
 
 
+def _parse_exif_datetime(s: str) -> Optional[str]:
+    """Parse an EXIF/XMP-style date string into ISO format."""
+    s = s.strip().rstrip("Z")
+    # Strip subseconds and timezone suffix like +02:00 / -05:00
+    s = re.sub(r"([+-]\d{2}:?\d{2})$", "", s).strip()
+    s = re.sub(r"\.\d+$", "", s).strip()
+    for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S",
+                "%Y-%m-%d %H:%M:%S", "%Y:%m:%d", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(s, fmt).isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+def _extract_date_from_xmp_or_png_text(filepath: str) -> Optional[str]:
+    """Fallback date extraction from XMP packet or PNG tEXt/iTXt chunks.
+
+    PIL's getexif() only reads the binary `eXIf` PNG chunk. Many screenshots
+    (notably iOS) embed the capture time in an XMP packet (xmp:CreateDate,
+    photoshop:DateCreated, exif:DateTimeOriginal) or in a PNG text chunk
+    (Creation Time / date:create) instead. Parse those as a fallback.
+    """
+    try:
+        with Image.open(filepath) as img:
+            # PNG text chunks
+            text = {}
+            text.update(getattr(img, "text", {}) or {})
+            text.update(getattr(img, "info", {}) or {})
+            for key in ("Creation Time", "date:create", "date:modify",
+                        "DateTimeOriginal", "DateTime"):
+                val = text.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val
+
+            # XMP packet (Pillow >= 8.2)
+            xmp = None
+            try:
+                xmp = img.getxmp()
+            except Exception:
+                xmp = None
+
+        if xmp:
+            # Walk the nested dict for the first date-ish key we recognize.
+            wanted = {"DateTimeOriginal", "DateCreated", "CreateDate",
+                      "DateTimeDigitized", "ModifyDate"}
+
+            def _walk(node):
+                if isinstance(node, dict):
+                    for k, v in node.items():
+                        kname = k.split(":")[-1] if isinstance(k, str) else ""
+                        if kname in wanted and isinstance(v, str) and v.strip():
+                            return v
+                        found = _walk(v)
+                        if found:
+                            return found
+                elif isinstance(node, list):
+                    for item in node:
+                        found = _walk(item)
+                        if found:
+                            return found
+                return None
+
+            return _walk(xmp)
+    except Exception:
+        pass
+    return None
+
+
 def _extract_exif_with_pillow(filepath: str, meta: dict) -> dict:
     """Extract metadata for HEIC/HEIF using Pillow + pillow-heif."""
     try:
