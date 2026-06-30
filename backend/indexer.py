@@ -470,7 +470,9 @@ def scan_directory(photos_dir: str = PHOTOS_DIR, known_hashes: dict = None, geoc
             meta = extract_exif(str(filepath))
 
         if not meta.get("date_taken"):
-            meta["date_taken"] = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
+            # Fallback chain: file created (birthtime) -> ctime -> mtime
+            ts = getattr(file_stat, "st_birthtime", None) or file_stat.st_ctime or file_stat.st_mtime
+            meta["date_taken"] = datetime.fromtimestamp(ts).isoformat()
 
         thumb_path = None
         duration = None
