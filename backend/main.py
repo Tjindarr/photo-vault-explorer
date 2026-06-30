@@ -69,8 +69,10 @@ def _process_single_file(args):
     from indexer import (
         file_hash, extract_exif, generate_thumbnail_and_phash,
         generate_video_thumbnail, get_video_duration, reverse_geocode,
+        date_from_filename,
         IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, THUMB_DIR,
     )
+
     from pathlib import Path
     import hashlib as _hashlib
     from datetime import datetime as _dt
