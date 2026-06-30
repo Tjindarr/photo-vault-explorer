@@ -216,11 +216,12 @@ def _extract_exif_with_pillow(filepath: str, meta: dict) -> dict:
         }
 
         dt_str = exif_by_name.get("DateTimeOriginal") or exif_by_name.get("DateTimeDigitized") or exif_by_name.get("DateTime")
+        if not dt_str:
+            dt_str = _extract_date_from_xmp_or_png_text(filepath)
         if dt_str:
-            try:
-                meta["date_taken"] = datetime.strptime(str(dt_str), "%Y:%m:%d %H:%M:%S").isoformat()
-            except ValueError:
-                pass
+            parsed = _parse_exif_datetime(str(dt_str))
+            if parsed:
+                meta["date_taken"] = parsed
 
         make = str(exif_by_name.get("Make", "")).strip()
         model = str(exif_by_name.get("Model", "")).strip()
